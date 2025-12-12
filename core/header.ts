@@ -53,11 +53,11 @@ export interface HeaderValidation {
 /** Regex to match separator lines */
 const SEPARATOR_REGEX = /^\/\/[-=*]+$/;
 
-/** Regex to match copyright line with year(s), name, and email */
-const COPYRIGHT_REGEX = /^\/\/\s*Copyright\s*\(c\)\s*(\d{4})(?:-(\d{4}))?\s+(\S+)\s+(\S+@\S+)/i;
+/** Regex to match copyright line with year(s), name, and email (name can be multi-word) */
+const COPYRIGHT_REGEX = /^\/\/\s*Copyright\s*\(c\)\s*(\d{4})(?:-(\d{4}))?\s+(.+?)\s{2,}(\S+@\S+)/i;
 
-/** Regex to match contributor continuation line (no year) */
-const CONTRIBUTOR_REGEX = /^\/\/\s{10,}(\S+)\s+(\S+@\S+)/;
+/** Regex to match contributor continuation line (no year, name can be multi-word) */
+const CONTRIBUTOR_REGEX = /^\/\/\s{10,}(.+?)\s{2,}(\S+@\S+)/;
 
 /** Regex to match SPDX license line */
 const SPDX_REGEX = /^\/\/\s*SPDX-License-Identifier:\s*(\S+)\s+(https?:\/\/\S+)?\s*(\S+@\S+)?/i;
