@@ -1,0 +1,88 @@
+name: Runtime Compatibility Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  compat:
+    name: Check Runtimes
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: 🦕 Test in Deno (Source)
+        run: deno run --allow-read tests/smoke.ts
+
+      - name: Build npm package
+        run: deno run -A scripts/build-npm.ts
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: "latest"
+
+      - name: Create Package Test Runner
+        run: |
+          # Create a version of the smoke test that imports from the built package
+          # We use the ESM output from the npm build to verify Node/Bun consumption
+          cat << 'EOF' > tests/smoke-pkg.mjs
+          import { hasValidHeader } from "../npm/esm/mod.js";
+
+          console.log("🧪 Running Package smoke test...");
+          
+          const SAMPLE_HEADER = \`//----------------------------------------------------------------------------------------------------
+          // Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+          // SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
+          //----------------------------------------------------------------------------------------------------
+          \`;
+          
+          const SAMPLE_CONTENT = \`console.log("Hello world");\`;
+          const FULL_FILE = SAMPLE_HEADER + "\n" + SAMPLE_CONTENT;
+          
+          let errors = 0;
+          
+          function assert(condition, message) {
+            if (!condition) {
+              console.error(\`❌ FAIL: \${message}\`);
+              errors++;
+            } else {
+              console.log(\`✅ PASS: \${message}\`);
+            }
+          }
+          
+          try {
+            assert(hasValidHeader(SAMPLE_CONTENT) === false, "Should return false for content without header");
+            assert(hasValidHeader(FULL_FILE) === true, "Should return true for content with valid header");
+          } catch (err) {
+            console.error("❌ CRITICAL: Uncaught exception during smoke test:", err);
+            errors++;
+          }
+          
+          if (errors > 0) {
+            console.error(\`\\n💥 Smoke test failed with \${errors} error(s).\`);
+            process.exit(1);
+          } else {
+            console.log("\\n✨ Smoke test passed successfully!");
+          }
+          EOF
+
+      - name: 🐢 Test in Node.js (Built Package)
+        run: node tests/smoke-pkg.mjs
+
+      - name: 🧅 Test in Bun (Built Package)
+        run: bun run tests/smoke-pkg.mjs
