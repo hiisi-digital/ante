@@ -21,7 +21,7 @@ jobs:
           deno-version: v2.x
 
       - name: 🦕 Test in Deno (Source)
-        run: deno run --allow-read tests/smoke.ts
+        run: deno run --allow-read tests/smoke.js
 
       - name: Build npm package
         run: deno run -A scripts/build-npm.ts
@@ -40,46 +40,8 @@ jobs:
         run: |
           # Create a version of the smoke test that imports from the built package
           # We use the ESM output from the npm build to verify Node/Bun consumption
-          cat << 'EOF' > tests/smoke-pkg.mjs
-          import { hasValidHeader } from "../npm/esm/mod.js";
-
-          console.log("🧪 Running Package smoke test...");
-          
-          const SAMPLE_HEADER = \`//----------------------------------------------------------------------------------------------------
-          // Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
-          // SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
-          //----------------------------------------------------------------------------------------------------
-          \`;
-          
-          const SAMPLE_CONTENT = \`console.log("Hello world");\`;
-          const FULL_FILE = SAMPLE_HEADER + "\n" + SAMPLE_CONTENT;
-          
-          let errors = 0;
-          
-          function assert(condition, message) {
-            if (!condition) {
-              console.error(\`❌ FAIL: \${message}\`);
-              errors++;
-            } else {
-              console.log(\`✅ PASS: \${message}\`);
-            }
-          }
-          
-          try {
-            assert(hasValidHeader(SAMPLE_CONTENT) === false, "Should return false for content without header");
-            assert(hasValidHeader(FULL_FILE) === true, "Should return true for content with valid header");
-          } catch (err) {
-            console.error("❌ CRITICAL: Uncaught exception during smoke test:", err);
-            errors++;
-          }
-          
-          if (errors > 0) {
-            console.error(\`\\n💥 Smoke test failed with \${errors} error(s).\`);
-            process.exit(1);
-          } else {
-            console.log("\\n✨ Smoke test passed successfully!");
-          }
-          EOF
+          cp tests/smoke.js tests/smoke-pkg.mjs
+          sed -i 's|../mod.ts|../npm/esm/mod.js|g' tests/smoke-pkg.mjs
 
       - name: 🐢 Test in Node.js (Built Package)
         run: node tests/smoke-pkg.mjs
