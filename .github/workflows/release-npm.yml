@@ -40,7 +40,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          registry-url: "https://registry.npmjs.org"
 
       - name: Verify version matches tag
         if: github.event_name == 'push'
@@ -108,9 +107,9 @@ jobs:
       - name: Publish to npm
         if: github.event.inputs.dry_run != 'true' && steps.check_version.outputs.already_published != 'true'
         working-directory: ./npm
+        # Using npm's trusted publishing (OIDC) - no token needed
+        # Requires id-token: write permission and trusted publisher configured on npm
         run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Post-publish verification
         if: github.event.inputs.dry_run != 'true' && steps.check_version.outputs.already_published != 'true'
