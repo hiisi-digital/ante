@@ -1,0 +1,23 @@
+#!/bin/sh
+
+echo "Running Deno format check..."
+if ! deno fmt --check; then
+  echo "Format check failed. Attempting to auto-format..."
+  deno fmt
+  echo "Auto-formatted. Please review changes and commit again."
+  exit 1
+fi
+
+echo "Running Deno lint..."
+if ! deno lint; then
+  echo "Lint check failed."
+  exit 1
+fi
+
+echo "Running Deno type check..."
+if ! deno check mod.ts; then
+  echo "Type check failed."
+  exit 1
+fi
+
+echo "All checks passed!"
