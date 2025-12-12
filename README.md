@@ -219,16 +219,14 @@ This project is licensed under the terms of the **Mozilla Public License 2.0**.
 
 ## Runtime Compatibility
 
-| Runtime     | Versions Tested  | Smoke | Types | Tests |
-| ----------- | ---------------- | :---: | :---: | :---: |
-| **Deno**    | 1.x, 2.x         |  ❓   |  ❓   |  ❓   |
-| **Node.js** | 18, 20, 22       |  ❓   |  ❓   |  ❓   |
-| **Bun**     | 1.0, 1.1, latest |  ❓   |  ❓   |  ❓   |
+| Runtime | Versions Tested | Smoke | Types | Tests |
+|---------|-----------------|:-----:|:-----:|:-----:|
+| **Deno** | 1.x, 2.x | ⚠️ | ⚠️ | ⚠️ |
+| **Node.js** | 18, 20, 22 | ✅ | ❌ | ❌ |
+| **Bun** | 1.0, 1.1, latest | ✅ | ❌ | ❌ |
 
 - **Smoke**: Basic import and function verification
 - **Types**: TypeScript definitions work correctly
-- **Tests**: Full unit + integration test suite passes
+- **Tests**: Full unit test suite passes
 
 > See [COMPATIBILITY.md](./COMPATIBILITY.md) for detailed version-by-version results.
-
-_This table is automatically updated by the [Runtime Compatibility Matrix](./.github/workflows/compat-check.yml) workflow._
