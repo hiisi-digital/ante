@@ -4,6 +4,7 @@
 
 [![GitHub Stars](https://img.shields.io/github/stars/hiisi-digital/ante.svg)](https://github.com/hiisi-digital/ante/stargazers)
 [![JSR Version](https://img.shields.io/jsr/v/@loru/ante)](https://jsr.io/@loru/ante)
+[![npm Version](https://img.shields.io/npm/v/ante-cli)](https://www.npmjs.com/package/ante-cli)
 [![GitHub Issues](https://img.shields.io/github/issues/hiisi-digital/ante.svg)](https://github.com/hiisi-digital/ante/issues)
 ![License](https://img.shields.io/github/license/hiisi-digital/ante?color=%23009689)
 
@@ -31,6 +32,20 @@ characters, and contributor selection strategy are all controlled through your
 
 ## Installation
 
+### CLI (recommended)
+
+```bash
+# npm (Node.js 18+)
+npm install -g ante-cli
+
+# Then use:
+ante init
+ante check
+ante fix
+```
+
+### Deno
+
 ```typescript
 import { generateHeader, loadConfig } from "jsr:@loru/ante";
 ```
@@ -45,29 +60,38 @@ Or in `deno.json`:
 }
 ```
 
+Run directly without installing:
+
+```bash
+deno run -A jsr:@loru/ante/cli init
+```
+
 ## CLI Usage
 
 ```bash
 # Set up config and install git hooks
-deno run -A jsr:@loru/ante/cli init
+ante init
 
 # Check if files have valid headers (exits non-zero if issues found)
-deno run -A jsr:@loru/ante/cli check
+ante check
 
 # Fix all headers to match config
-deno run -A jsr:@loru/ante/cli fix
+ante fix
 
 # Add header to a specific file
-deno run -A jsr:@loru/ante/cli add src/new-file.ts
+ante add src/new-file.ts
+
+# Show help
+ante --help
 ```
 
-Or add tasks to your `deno.json`:
+Or add tasks to your `deno.json` / `package.json`:
 
 ```json
 {
-  "tasks": {
-    "copyright:check": "deno run -A jsr:@loru/ante/cli check",
-    "copyright:fix": "deno run -A jsr:@loru/ante/cli fix"
+  "scripts": {
+    "copyright:check": "ante check",
+    "copyright:fix": "ante fix"
   }
 }
 ```
