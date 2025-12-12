@@ -3,7 +3,7 @@
 <div align="center" style="text-align: center;">
 
 [![GitHub Stars](https://img.shields.io/github/stars/hiisi-digital/ante.svg)](https://github.com/hiisi-digital/ante/stargazers)
-[![JSR Version](https://img.shields.io/jsr/v/@loru/ante)](https://jsr.io/@loru/ante)
+[![JSR Version](https://img.shields.io/jsr/v/@hiisi/ante)](https://jsr.io/@hiisi/ante)
 [![npm Version](https://img.shields.io/npm/v/ante-cli)](https://www.npmjs.com/package/ante-cli)
 [![GitHub Issues](https://img.shields.io/github/issues/hiisi-digital/ante.svg)](https://github.com/hiisi-digital/ante/issues)
 ![License](https://img.shields.io/github/license/hiisi-digital/ante?color=%23009689)
@@ -39,10 +39,10 @@ yarn global add ante-cli
 pnpm add -g ante-cli
 
 # Deno
-deno install -gAf jsr:@loru/ante/cli
+deno install -gAf jsr:@hiisi/ante/cli
 
 # Or run directly without installing
-deno run -A jsr:@loru/ante/cli <command>
+deno run -A jsr:@hiisi/ante/cli <command>
 npx ante-cli <command>
 ```
 
@@ -50,7 +50,7 @@ As a library:
 
 ```typescript
 // Deno / JSR
-import { generateHeader, loadConfig } from "jsr:@loru/ante";
+import { generateHeader, loadConfig } from "jsr:@hiisi/ante";
 
 // Node.js
 import { generateHeader, loadConfig } from "ante-cli";
@@ -62,7 +62,7 @@ Or add to your project:
 // deno.json
 {
   "imports": {
-    "@loru/ante": "jsr:@loru/ante@^0.1"
+    "@hiisi/ante": "jsr:@hiisi/ante@^0.1"
   }
 }
 
@@ -91,8 +91,8 @@ Add to your project scripts:
 // deno.json
 {
   "tasks": {
-    "copyright:check": "deno run -A jsr:@loru/ante/cli check",
-    "copyright:fix": "deno run -A jsr:@loru/ante/cli fix"
+    "copyright:check": "deno run -A jsr:@hiisi/ante/cli check",
+    "copyright:fix": "deno run -A jsr:@hiisi/ante/cli fix"
   }
 }
 
@@ -159,7 +159,13 @@ used to derive `spdxLicense` and `licenseUrl` automatically.
 ## Library API
 
 ```typescript
-import { generateHeader, hasValidHeader, loadConfig, parseHeader, resolveConfig } from "@loru/ante"; // or "ante-cli" for Node.js
+import {
+  generateHeader,
+  hasValidHeader,
+  loadConfig,
+  parseHeader,
+  resolveConfig,
+} from "@hiisi/ante"; // or "ante-cli" for Node.js
 
 // Load config from deno.json / package.json
 const config = await loadConfig();

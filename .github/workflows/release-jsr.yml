@@ -13,8 +13,8 @@ on:
         type: boolean
 
 env:
-  # JSR uses scoped packages - @loru/ante as configured in deno.json
-  JSR_PACKAGE_NAME: "@loru/ante"
+  # JSR uses scoped packages - @hiisi/ante for generic hiisi tools
+  JSR_PACKAGE_NAME: "@hiisi/ante"
 
 jobs:
   publish:
