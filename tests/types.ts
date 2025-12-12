@@ -39,5 +39,6 @@ run().catch((err) => {
   // @ts-ignore Node/Bun globals
   // deno-lint-ignore no-process-global
   if (typeof process !== "undefined") process.exit(1);
+  // @ts-ignore Deno globals
   if (typeof Deno !== "undefined") Deno.exit(1);
 });
