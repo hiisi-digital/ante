@@ -67,9 +67,10 @@ jobs:
         continue-on-error: true
         run: |
           npm init -y
+          npm pkg set type="module"
           npm install typescript @types/node tsx
           # Check types
-          npx tsc tests/types-pkg.ts --target es2022 --moduleResolution node --allowSyntheticDefaultImports --noEmit
+          npx tsc tests/types-pkg.ts --target es2022 --module nodenext --moduleResolution nodenext --allowSyntheticDefaultImports --noEmit
           # Run logic
           npx tsx tests/types-pkg.ts
 
