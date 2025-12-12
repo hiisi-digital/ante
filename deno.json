@@ -14,9 +14,13 @@
     "#cli": "./cli/mod.ts"
   },
   "lint": {
-    "include": ["**/*.ts"],
+    "include": [
+      "**/*.ts"
+    ],
     "rules": {
-      "tags": ["recommended"],
+      "tags": [
+        "recommended"
+      ],
       "include": [
         "camelcase",
         "default-param-last",
@@ -49,12 +53,15 @@
     "semiColons": true,
     "singleQuote": false,
     "proseWrap": "preserve",
-    "include": ["**/*.ts", "*.md"]
+    "include": [
+      "**/*.ts",
+      "*.md"
+    ]
   },
   "tasks": {
-    "test": "deno test --allow-read --allow-env --allow-run",
-    "test:watch": "deno test --allow-read --allow-env --allow-run --watch",
-    "test:coverage": "deno test --allow-read --allow-env --allow-run --coverage=coverage/",
+    "test": "deno test --allow-read --allow-write --allow-env --allow-run",
+    "test:watch": "deno test --allow-read --allow-write --allow-env --allow-run --watch",
+    "test:coverage": "deno test --allow-read --allow-write --allow-env --allow-run --coverage=coverage/",
     "lint": "deno lint",
     "lint:fix": "deno lint --fix",
     "fmt": "deno fmt",
@@ -91,5 +98,12 @@
       "scripts/",
       ".githooks/"
     ]
+  },
+  "ante": {
+    "width": 100,
+    "maxContributors": 3,
+    "contributorSelection": "commits",
+    "spdxLicense": "MPL-2.0",
+    "licenseUrl": "https://mozilla.org/MPL/2.0"
   }
 }
