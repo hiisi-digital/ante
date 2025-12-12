@@ -1,4 +1,9 @@
-name: Runtime Compatibility Check
+#----------------------------------------------------------------------------------------------------
+# Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+# SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
+#----------------------------------------------------------------------------------------------------
+
+name: Runtime Compatibility Matrix
 
 on:
   push:
@@ -6,13 +11,18 @@ on:
   pull_request:
   workflow_dispatch:
 
-jobs:
-  compat:
-    name: Check Runtimes
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
+# Cancel in-progress runs for the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
+jobs:
+  # ============================================================================
+  # Build packages for testing
+  # ============================================================================
+  build:
+    name: Build packages
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -22,116 +32,340 @@ jobs:
         with:
           deno-version: v2.x
 
-      - name: 🦕 Test in Deno (Source)
-        id: deno_js
-        continue-on-error: true
-        run: deno run --allow-read tests/smoke.js
-
-      - name: 🦕 Test Types in Deno (Source)
-        id: deno_ts
-        continue-on-error: true
-        run: |
-          deno check tests/types.ts
-          deno run --allow-read tests/types.ts
-
-      - name: Build npm package
+      - name: Build npm package (production)
         run: deno run -A scripts/build-npm.ts
 
-      - name: Setup Node.js
+      - name: Build npm package with tests
+        run: deno run -A scripts/build-npm-with-tests.ts --skip-test
+
+      - name: Upload npm artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-package
+          path: npm/
+          retention-days: 1
+
+      - name: Upload npm-test artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-test-package
+          path: npm-test/
+          retention-days: 1
+
+  # ============================================================================
+  # Test Deno versions (runs against source)
+  # ============================================================================
+  test-deno:
+    name: Deno ${{ matrix.deno-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        deno-version: ["v1.x", "v2.x"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Deno ${{ matrix.deno-version }}
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ matrix.deno-version }}
+
+      - name: Show Deno version
+        id: version
+        run: |
+          VERSION=$(deno --version | head -n1 | awk '{print $2}')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Deno version: $VERSION"
+
+      - name: Smoke test
+        id: smoke
+        continue-on-error: true
+        run: deno run --allow-read tests/deno/smoke.test.ts
+
+      - name: Type check
+        id: types
+        continue-on-error: true
+        run: |
+          deno check tests/deno/types.test.ts
+          deno run --allow-read tests/deno/types.test.ts
+
+      - name: Full test suite (unit + integration)
+        id: tests
+        continue-on-error: true
+        run: |
+          deno test --allow-read --allow-write --allow-env --allow-run \
+            tests/_utils/ \
+            tests/config_test.ts \
+            tests/contributors_test.ts \
+            tests/formatter_test.ts \
+            tests/glob_test.ts \
+            tests/header_test.ts \
+            tests/integration_test.ts
+
+      - name: Write result
+        run: |
+          mkdir -p results
+          cat > results/deno-${{ matrix.deno-version }}.json << JSONEOF
+          {
+            "runtime": "deno",
+            "version": "${{ matrix.deno-version }}",
+            "actualVersion": "${{ steps.version.outputs.version }}",
+            "smoke": "${{ steps.smoke.outcome }}",
+            "types": "${{ steps.types.outcome }}",
+            "tests": "${{ steps.tests.outcome }}"
+          }
+          JSONEOF
+          cat results/deno-${{ matrix.deno-version }}.json
+
+      - name: Upload result
+        uses: actions/upload-artifact@v4
+        with:
+          name: result-deno-${{ matrix.deno-version }}
+          path: results/
+          retention-days: 1
+
+  # ============================================================================
+  # Test Node.js versions (runs against built package)
+  # ============================================================================
+  test-node:
+    name: Node.js ${{ matrix.node-version }}
+    runs-on: ubuntu-latest
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["18", "20", "22"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download npm artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: npm-package
+          path: npm/
+
+      - name: Download npm-test artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: npm-test-package
+          path: npm-test/
+
+      - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: ${{ matrix.node-version }}
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: "latest"
-
-      - name: Create Package Test Runners
+      - name: Show Node version
+        id: version
         run: |
-          # Create a version of the smoke test that imports from the built package
-          # We use the ESM output from the npm build to verify Node/Bun consumption
-          cp tests/smoke.js tests/smoke-pkg.mjs
-          sed -i 's|../mod.ts|../npm/esm/mod.js|g' tests/smoke-pkg.mjs
-          
-          cp tests/types.ts tests/types-pkg.ts
-          sed -i 's|../mod.ts|../npm/esm/mod.js|g' tests/types-pkg.ts
+          VERSION=$(node --version)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Node.js version: $VERSION"
 
-      - name: 🐢 Test in Node.js (Built Package)
-        id: node_js
+      - name: Smoke test
+        id: smoke
         continue-on-error: true
-        run: node tests/smoke-pkg.mjs
+        run: node tests/node/smoke.test.mjs
 
-      - name: 🐢 Test Types in Node.js (Built Package)
-        id: node_ts
-        continue-on-error: true
+      - name: Install TypeScript dependencies
         run: |
           npm init -y
           npm pkg set type="module"
-          npm install typescript @types/node tsx
-          # Check types
-          npx tsc tests/types-pkg.ts --target es2022 --module nodenext --moduleResolution nodenext --allowSyntheticDefaultImports --noEmit
-          # Run logic
-          npx tsx tests/types-pkg.ts
+          npm install typescript tsx
 
-      - name: 🧅 Test in Bun (Built Package)
-        id: bun_js
+      - name: Type check
+        id: types
         continue-on-error: true
-        run: bun run tests/smoke-pkg.mjs
+        run: npx tsx tests/node/types.test.ts
 
-      - name: 🧅 Test Types in Bun (Built Package)
-        id: bun_ts
+      - name: Install test package dependencies
+        working-directory: npm-test
+        run: npm install
+
+      - name: Full test suite (unit + integration)
+        id: tests
         continue-on-error: true
-        run: bun run tests/types-pkg.ts
-
-      - name: Generate Compatibility Matrix
-        id: matrix
+        working-directory: npm-test
         run: |
-          echo "## Runtime Compatibility Matrix" > COMPATIBILITY.md
-          echo "" >> COMPATIBILITY.md
-          echo "Current status of runtime support tests:" >> COMPATIBILITY.md
-          echo "" >> COMPATIBILITY.md
-          echo "| Runtime | JavaScript (Smoke) | TypeScript (Types + Smoke) |" >> COMPATIBILITY.md
-          echo "| :--- | :---: | :---: |" >> COMPATIBILITY.md
-          
-          DENO_JS="${{ steps.deno_js.outcome == 'success' && '✅' || '❌' }}"
-          DENO_TS="${{ steps.deno_ts.outcome == 'success' && '✅' || '❌' }}"
-          echo "| **Deno** | $DENO_JS | $DENO_TS |" >> COMPATIBILITY.md
-          
-          NODE_JS="${{ steps.node_js.outcome == 'success' && '✅' || '❌' }}"
-          NODE_TS="${{ steps.node_ts.outcome == 'success' && '✅' || '❌' }}"
-          echo "| **Node.js** | $NODE_JS | $NODE_TS |" >> COMPATIBILITY.md
+          echo "Running test suite on Node.js ${{ matrix.node-version }}..."
+          # Run tests using the test runner script
+          node test-runner.js
 
-          BUN_JS="${{ steps.bun_js.outcome == 'success' && '✅' || '❌' }}"
-          BUN_TS="${{ steps.bun_ts.outcome == 'success' && '✅' || '❌' }}"
-          echo "| **Bun** | $BUN_JS | $BUN_TS |" >> COMPATIBILITY.md
-          
-          echo "" >> COMPATIBILITY.md
-          echo "_Last updated: $(date -u)_" >> COMPATIBILITY.md
-          
-          cat COMPATIBILITY.md
+      - name: Write result
+        run: |
+          mkdir -p results
+          cat > results/node-${{ matrix.node-version }}.json << JSONEOF
+          {
+            "runtime": "node",
+            "version": "${{ matrix.node-version }}",
+            "actualVersion": "${{ steps.version.outputs.version }}",
+            "smoke": "${{ steps.smoke.outcome }}",
+            "types": "${{ steps.types.outcome }}",
+            "tests": "${{ steps.tests.outcome }}"
+          }
+          JSONEOF
+          cat results/node-${{ matrix.node-version }}.json
 
-      - name: Update README and Push
+      - name: Upload result
+        uses: actions/upload-artifact@v4
+        with:
+          name: result-node-${{ matrix.node-version }}
+          path: results/
+          retention-days: 1
+
+  # ============================================================================
+  # Test Bun versions (runs against built package)
+  # ============================================================================
+  test-bun:
+    name: Bun ${{ matrix.bun-version }}
+    runs-on: ubuntu-latest
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        bun-version: ["1.0.0", "1.1.0", "latest"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download npm artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: npm-package
+          path: npm/
+
+      - name: Download npm-test artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: npm-test-package
+          path: npm-test/
+
+      - name: Setup Bun ${{ matrix.bun-version }}
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ matrix.bun-version }}
+
+      - name: Show Bun version
+        id: version
+        run: |
+          VERSION=$(bun --version)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Bun version: $VERSION"
+
+      - name: Smoke test
+        id: smoke
+        continue-on-error: true
+        run: bun run tests/node/smoke.test.mjs
+
+      - name: Type check
+        id: types
+        continue-on-error: true
+        run: bun run tests/node/types.test.ts
+
+      - name: Install test package dependencies
+        working-directory: npm-test
+        run: bun install
+
+      - name: Full test suite (unit + integration)
+        id: tests
+        continue-on-error: true
+        working-directory: npm-test
+        run: |
+          echo "Running test suite on Bun ${{ matrix.bun-version }}..."
+          # Run tests using the Bun test runner script
+          bun bun-test-runner.js
+
+      - name: Write result
+        run: |
+          mkdir -p results
+          SAFE_VERSION=$(echo "${{ matrix.bun-version }}" | tr '.' '_')
+          cat > results/bun-${SAFE_VERSION}.json << JSONEOF
+          {
+            "runtime": "bun",
+            "version": "${{ matrix.bun-version }}",
+            "actualVersion": "${{ steps.version.outputs.version }}",
+            "smoke": "${{ steps.smoke.outcome }}",
+            "types": "${{ steps.types.outcome }}",
+            "tests": "${{ steps.tests.outcome }}"
+          }
+          JSONEOF
+          cat results/bun-${SAFE_VERSION}.json
+
+      - name: Upload result
+        uses: actions/upload-artifact@v4
+        with:
+          name: result-bun-${{ matrix.bun-version }}
+          path: results/
+          retention-days: 1
+
+  # ============================================================================
+  # Collect results and generate compatibility matrix
+  # ============================================================================
+  report:
+    name: Generate Compatibility Report
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [test-deno, test-node, test-bun]
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: result-*
+          path: all-results/
+          merge-multiple: false
+
+      - name: List downloaded results
+        run: |
+          echo "Downloaded results:"
+          find all-results -name "*.json" -type f | sort | while read f; do
+            echo "=== $f ==="
+            cat "$f"
+          done
+
+      - name: Generate COMPATIBILITY.md
+        run: |
+          chmod +x scripts/generate-compat-report.sh
+          ./scripts/generate-compat-report.sh \
+            "all-results" \
+            "${{ github.run_number }}" \
+            "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - name: Update README.md with compatibility section
+        run: |
+          chmod +x scripts/update-readme-compat.sh
+          ./scripts/update-readme-compat.sh "all-results"
+
+      - name: Commit and push changes
         if: github.event_name != 'pull_request'
         run: |
-          # Configure git
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Replace existing section (assuming it's at the bottom) or append
-          if ! grep -q "## Runtime Compatibility Matrix" README.md; then
-            echo "" >> README.md
-            cat COMPATIBILITY.md >> README.md
-          else
-             # Delete from the header to the end of file, then append new
-             sed -i '/## Runtime Compatibility Matrix/,$d' README.md
-             cat COMPATIBILITY.md >> README.md
-          fi
-          
-          git add README.md COMPATIBILITY.md
+
+          git add COMPATIBILITY.md README.md
+
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "docs: update runtime compatibility matrix"
+            git commit -m "docs: update runtime compatibility matrix [skip ci]"
             git push
           fi
+
+      - name: Upload final report
+        uses: actions/upload-artifact@v4
+        with:
+          name: compatibility-report
+          path: |
+            COMPATIBILITY.md
+            all-results/
+          retention-days: 30
