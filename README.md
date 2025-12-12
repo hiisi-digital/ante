@@ -159,7 +159,13 @@ used to derive `spdxLicense` and `licenseUrl` automatically.
 ## Library API
 
 ```typescript
-import { generateHeader, hasValidHeader, loadConfig, parseHeader, resolveConfig } from "@hiisi/ante"; // or "ante-cli" for Node.js
+import {
+  generateHeader,
+  hasValidHeader,
+  loadConfig,
+  parseHeader,
+  resolveConfig,
+} from "@hiisi/ante"; // or "ante-cli" for Node.js
 
 // Load config from deno.json / package.json
 const config = await loadConfig();
