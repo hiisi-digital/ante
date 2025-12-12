@@ -1,5 +1,6 @@
 //----------------------------------------------------------------------------------------------------
 // Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+//                                      orgrinrt                 ort@hiisi.digital
 // SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
 //----------------------------------------------------------------------------------------------------
 
@@ -8,6 +9,8 @@
  *
  * These tests create temporary directories and files to simulate
  * real-world usage of the ante tool.
+ *
+ * This test file uses cross-runtime utilities to work on Deno, Node.js, and Bun.
  */
 
 import {
@@ -23,34 +26,17 @@ import {
 import { assertEquals, assertExists } from "@std/assert";
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
 import { DEFAULT_CONFIG } from "../core/config.generated.ts";
-
-/**
- * Helper to create a temporary directory for testing.
- */
-async function createTempDir(): Promise<string> {
-  return await Deno.makeTempDir({ prefix: "ante_test_" });
-}
-
-/**
- * Helper to clean up a temporary directory.
- */
-async function cleanupTempDir(dir: string): Promise<void> {
-  try {
-    await Deno.remove(dir, { recursive: true });
-  } catch {
-    // Ignore errors during cleanup
-  }
-}
+import { createTempDir, joinPath, readFile, removeDir, writeFile } from "./_utils/mod.ts";
 
 describe("Integration: Full Header Workflow", () => {
   let tempDir: string;
 
   beforeEach(async () => {
-    tempDir = await createTempDir();
+    tempDir = await createTempDir("ante_test_");
   });
 
   afterEach(async () => {
-    await cleanupTempDir(tempDir);
+    await removeDir(tempDir);
   });
 
   it("should add header to a file without one", async () => {
@@ -63,21 +49,21 @@ describe("Integration: Full Header Workflow", () => {
     const contributors = [{ name: "Test Author", email: "author@example.com" }];
 
     // Create a file without a header
-    const filePath = `${tempDir}/test.ts`;
+    const filePath = joinPath(tempDir, "test.ts");
     const originalContent = `export function hello(): string {
   return "Hello, World!";
 }
 `;
-    await Deno.writeTextFile(filePath, originalContent);
+    await writeFile(filePath, originalContent);
 
     // Generate and add header
     const header = generateHeader(config, contributors, 2025);
-    const content = await Deno.readTextFile(filePath);
+    const content = await readFile(filePath);
     const newContent = replaceHeader(content, header);
-    await Deno.writeTextFile(filePath, newContent);
+    await writeFile(filePath, newContent);
 
     // Verify
-    const finalContent = await Deno.readTextFile(filePath);
+    const finalContent = await readFile(filePath);
     assertEquals(hasValidHeader(finalContent), true);
     assertEquals(finalContent.includes("Test Author"), true);
     assertEquals(finalContent.includes("author@example.com"), true);
@@ -93,7 +79,7 @@ describe("Integration: Full Header Workflow", () => {
     });
 
     // Create a file with an existing header
-    const filePath = `${tempDir}/existing.ts`;
+    const filePath = joinPath(tempDir, "existing.ts");
     const existingHeader =
       `//----------------------------------------------------------------------------------------------------
 // Copyright (c) 2024                    original                    original@example.com
@@ -102,10 +88,10 @@ describe("Integration: Full Header Workflow", () => {
 
 export const value = 42;
 `;
-    await Deno.writeTextFile(filePath, existingHeader);
+    await writeFile(filePath, existingHeader);
 
     // Read and parse existing header
-    const content = await Deno.readTextFile(filePath);
+    const content = await readFile(filePath);
     const parsed = parseHeader(content);
     assertExists(parsed);
 
@@ -116,10 +102,10 @@ export const value = 42;
       updateYear: 2025,
     });
     const newContent = replaceHeader(content, updatedHeader, parsed);
-    await Deno.writeTextFile(filePath, newContent);
+    await writeFile(filePath, newContent);
 
     // Verify
-    const finalContent = await Deno.readTextFile(filePath);
+    const finalContent = await readFile(filePath);
     assertEquals(hasValidHeader(finalContent), true);
     assertEquals(finalContent.includes("original@example.com"), true);
     assertEquals(finalContent.includes("newdev@example.com"), true);
@@ -135,7 +121,7 @@ export const value = 42;
     });
 
     // Create file with matching license
-    const validFile = `${tempDir}/valid.ts`;
+    const validFile = joinPath(tempDir, "valid.ts");
     const validHeader =
       `//----------------------------------------------------------------------------------------------------
 // Copyright (c) 2025                    author                      author@example.com
@@ -144,10 +130,10 @@ export const value = 42;
 
 export const x = 1;
 `;
-    await Deno.writeTextFile(validFile, validHeader);
+    await writeFile(validFile, validHeader);
 
     // Create file with mismatched license
-    const mismatchFile = `${tempDir}/mismatch.ts`;
+    const mismatchFile = joinPath(tempDir, "mismatch.ts");
     const mismatchHeader =
       `//----------------------------------------------------------------------------------------------------
 // Copyright (c) 2025                    author                      author@example.com
@@ -156,15 +142,15 @@ export const x = 1;
 
 export const y = 2;
 `;
-    await Deno.writeTextFile(mismatchFile, mismatchHeader);
+    await writeFile(mismatchFile, mismatchHeader);
 
     // Validate
-    const validContent = await Deno.readTextFile(validFile);
+    const validContent = await readFile(validFile);
     const validResult = validateHeader(validContent, config);
     assertEquals(validResult.valid, true);
     assertEquals(validResult.issues.length, 0);
 
-    const mismatchContent = await Deno.readTextFile(mismatchFile);
+    const mismatchContent = await readFile(mismatchFile);
     const mismatchResult = validateHeader(mismatchContent, config);
     assertEquals(mismatchResult.valid, false);
     assertEquals(mismatchResult.issues.some((i) => i.includes("does not match")), true);
@@ -175,10 +161,10 @@ export const y = 2;
       spdxLicense: "MIT",
     });
 
-    const noHeaderFile = `${tempDir}/noheader.ts`;
-    await Deno.writeTextFile(noHeaderFile, "export const z = 3;\n");
+    const noHeaderFile = joinPath(tempDir, "noheader.ts");
+    await writeFile(noHeaderFile, "export const z = 3;\n");
 
-    const content = await Deno.readTextFile(noHeaderFile);
+    const content = await readFile(noHeaderFile);
     const result = validateHeader(content, config);
 
     assertEquals(result.valid, false);
@@ -219,18 +205,18 @@ export class UserService {
 }
 `;
 
-    const filePath = `${tempDir}/complex.ts`;
-    await Deno.writeTextFile(filePath, complexCode);
+    const filePath = joinPath(tempDir, "complex.ts");
+    await writeFile(filePath, complexCode);
 
     // Add header
     const contributors = [{ name: "Developer", email: "dev@example.com" }];
     const header = generateHeader(config, contributors, 2025);
-    const content = await Deno.readTextFile(filePath);
+    const content = await readFile(filePath);
     const newContent = replaceHeader(content, header);
-    await Deno.writeTextFile(filePath, newContent);
+    await writeFile(filePath, newContent);
 
     // Verify all code is preserved
-    const finalContent = await Deno.readTextFile(filePath);
+    const finalContent = await readFile(filePath);
     assertEquals(finalContent.includes("export interface User"), true);
     assertEquals(finalContent.includes("export function createUser"), true);
     assertEquals(finalContent.includes("export class UserService"), true);
@@ -242,11 +228,11 @@ describe("Integration: Configuration Loading", () => {
   let tempDir: string;
 
   beforeEach(async () => {
-    tempDir = await createTempDir();
+    tempDir = await createTempDir("ante_config_test_");
   });
 
   afterEach(async () => {
-    await cleanupTempDir(tempDir);
+    await removeDir(tempDir);
   });
 
   it("should load config from deno.json", async () => {
@@ -261,8 +247,8 @@ describe("Integration: Configuration Loading", () => {
       },
     };
 
-    const configPath = `${tempDir}/deno.json`;
-    await Deno.writeTextFile(configPath, JSON.stringify(denoJson, null, 2));
+    const configPath = joinPath(tempDir, "deno.json");
+    await writeFile(configPath, JSON.stringify(denoJson, null, 2));
 
     const config = await loadConfig(configPath);
 
@@ -275,7 +261,7 @@ describe("Integration: Configuration Loading", () => {
 
   it("should use defaults when no config file exists", async () => {
     // loadConfig will fall back to defaults when no file found
-    const config = await loadConfig(`${tempDir}/nonexistent.json`);
+    const config = await loadConfig(joinPath(tempDir, "nonexistent.json"));
 
     assertEquals(config.width, DEFAULT_CONFIG.width);
     assertEquals(config.maxContributors, DEFAULT_CONFIG.maxContributors);
@@ -290,8 +276,8 @@ describe("Integration: Configuration Loading", () => {
       },
     };
 
-    const configPath = `${tempDir}/deno.json`;
-    await Deno.writeTextFile(configPath, JSON.stringify(denoJson, null, 2));
+    const configPath = joinPath(tempDir, "deno.json");
+    await writeFile(configPath, JSON.stringify(denoJson, null, 2));
 
     const config = await loadConfig(configPath);
 

@@ -217,14 +217,18 @@ This project is licensed under the terms of the **Mozilla Public License 2.0**.
 
 `SPDX-License-Identifier: MPL-2.0`
 
-## Runtime Compatibility Matrix
+## Runtime Compatibility
 
-Current status of runtime support tests:
+| Runtime     | Versions Tested  | Smoke | Types | Tests |
+| ----------- | ---------------- | :---: | :---: | :---: |
+| **Deno**    | 1.x, 2.x         |  ❓   |  ❓   |  ❓   |
+| **Node.js** | 18, 20, 22       |  ❓   |  ❓   |  ❓   |
+| **Bun**     | 1.0, 1.1, latest |  ❓   |  ❓   |  ❓   |
 
-| Runtime | JavaScript (Smoke) | TypeScript (Types + Smoke) |
-| :--- | :---: | :---: |
-| **Deno** | ✅ | ✅ |
-| **Node.js** | ✅ | ❌ |
-| **Bun** | ✅ | ❌ |
+- **Smoke**: Basic import and function verification
+- **Types**: TypeScript definitions work correctly
+- **Tests**: Full unit + integration test suite passes
 
-_Last updated: Fri Dec 12 13:07:29 UTC 2025_
+> See [COMPATIBILITY.md](./COMPATIBILITY.md) for detailed version-by-version results.
+
+_This table is automatically updated by the [Runtime Compatibility Matrix](./.github/workflows/compat-check.yml) workflow._

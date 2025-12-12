@@ -4,19 +4,21 @@
 //----------------------------------------------------------------------------------------------------
 
 /**
- * Smoke test for verifying runtime compatibility.
+ * Smoke test for Node.js and Bun runtimes.
  *
- * This script imports the library and performs basic checks.
- * It is designed to be runnable in Deno directly (testing source)
- * or adapted to run in Node/Bun against the built package.
+ * This test imports from the built npm package (./npm/esm/mod.js) and verifies
+ * that the core functionality works correctly in these runtimes.
+ *
+ * Run with:
+ *   node tests/node/smoke.test.mjs
+ *   bun run tests/node/smoke.test.mjs
  */
 
-import { hasValidHeader } from "../mod.ts";
+import { hasValidHeader } from "../../npm/esm/mod.js";
 
-console.log("Running Ante smoke test...");
+console.log("Running Ante smoke test (Node/Bun)...");
 
-const SAMPLE_HEADER =
-  `//----------------------------------------------------------------------------------------------------
+const SAMPLE_HEADER = `//----------------------------------------------------------------------------------------------------
 // Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
 // SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
 //----------------------------------------------------------------------------------------------------
@@ -41,14 +43,27 @@ try {
   // Test 1: Content without header
   assert(
     hasValidHeader(SAMPLE_CONTENT) === false,
-    "Should return false for content without header",
+    "Should return false for content without header"
   );
 
   // Test 2: Content with valid header
   assert(
     hasValidHeader(FULL_FILE) === true,
-    "Should return true for content with valid header",
+    "Should return true for content with valid header"
   );
+
+  // Test 3: Empty string
+  assert(
+    hasValidHeader("") === false,
+    "Should return false for empty string"
+  );
+
+  // Test 4: Just the header (no content)
+  assert(
+    hasValidHeader(SAMPLE_HEADER) === true,
+    "Should return true for just the header"
+  );
+
 } catch (err) {
   console.error("CRITICAL: Uncaught exception during smoke test:");
   console.error(err);
@@ -57,11 +72,8 @@ try {
 
 if (errors > 0) {
   console.error(`\nSmoke test failed with ${errors} error(s).`);
-  // Cross-runtime exit
-  if (typeof Deno !== "undefined") Deno.exit(1);
-  // @ts-ignore Node/Bun globals
-  // deno-lint-ignore no-process-global
-  if (typeof process !== "undefined") process.exit(1);
+  process.exit(1);
 } else {
   console.log("\nSmoke test passed successfully!");
+  process.exit(0);
 }
