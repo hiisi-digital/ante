@@ -41,6 +41,17 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Update npm and debug OIDC
+        run: |
+          npm install -g npm@latest
+          echo "Node version: $(node -v)"
+          echo "npm version: $(npm -v)"
+          if [ -z "$ACTIONS_ID_TOKEN_REQUEST_URL" ]; then
+            echo "::warning::ACTIONS_ID_TOKEN_REQUEST_URL is not set. OIDC token generation might fail."
+          else
+            echo "ACTIONS_ID_TOKEN_REQUEST_URL is present."
+          fi
+
       - name: Verify version matches tag
         if: github.event_name == 'push'
         run: |
@@ -110,6 +121,11 @@ jobs:
         # Using npm's trusted publishing (OIDC) - no token needed
         # Requires id-token: write permission and trusted publisher configured on npm
         run: |
+          if [ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ]; then
+            echo "OIDC token request URL is available."
+          else
+            echo "::error::ACTIONS_ID_TOKEN_REQUEST_URL is missing."
+          fi
           npm config set registry https://registry.npmjs.org/
           npm publish --access public --provenance --verbose
 
