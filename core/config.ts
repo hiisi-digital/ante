@@ -10,124 +10,48 @@
  * - deno.json / package.json "ante" section
  * - Git config (user.name, user.email)
  * - Sensible defaults
+ *
+ * Types are generated from schema/config.schema.json - see config.generated.ts
  */
 
-// TODO: Implement loadConfig(path?: string) - find and load deno.json
-// TODO: Implement resolveConfig(partial) - merge with defaults
-// TODO: Implement deriveLicenseUrl(spdx: string) - map SPDX -> URL
-// TODO: Implement getGitConfig(key: string) - read git config values
+// Re-export all generated types
+export type {
+  AnteConfig,
+  Contributor,
+  ContributorSelection,
+  ResolvedConfig,
+} from "./config.generated.ts";
+
+export { DEFAULT_CONFIG } from "./config.generated.ts";
+
+import type { AnteConfig, ResolvedConfig } from "./config.generated.ts";
+import { DEFAULT_CONFIG } from "./config.generated.ts";
 
 /**
- * Represents a contributor in a copyright header.
+ * Well-known SPDX license identifiers mapped to their canonical URLs.
  */
-export interface Contributor {
-  /** The contributor's display name */
-  name: string;
-  /** The contributor's email address */
-  email: string;
-}
-
-/**
- * Contributor selection strategy.
- */
-export type ContributorSelection = "commits" | "lines" | "recent" | "manual";
-
-/**
- * Configuration for ante copyright header management.
- * This interface is generated from schema/config.schema.json.
- */
-export interface AnteConfig {
-  /** Total line width for headers. Default: 100 */
-  width: number;
-
-  /** Character used for separator lines. Default: "-" */
-  separatorChar: string;
-
-  /** Comment prefix for the language. Default: "//" */
-  commentPrefix: string;
-
-  /** Column position where name starts (0-indexed). Default: 40 */
-  nameColumn: number;
-
-  /** Column position where email starts (0-indexed). Default: 65 */
-  emailColumn: number;
-
-  /** Column position for license URL in SPDX line (0-indexed). Default: 40 */
-  licenseUrlColumn: number;
-
-  /** Column position for maintainer contact in SPDX line (0-indexed). Default: 75 */
-  maintainerColumn: number;
-
-  /** SPDX license identifier. Default: from deno.json "license" or "MIT" */
-  spdxLicense: string;
-
-  /** License URL. Default: derived from SPDX identifier */
-  licenseUrl: string;
-
-  /** Maintainer contact email. Default: from git config user.email */
-  maintainerEmail: string;
-
-  /** Maximum contributors to show in header. Default: 3 */
-  maxContributors: number;
-
-  /** Strategy for selecting contributors. Default: "commits" */
-  contributorSelection: ContributorSelection;
-
-  /** Manual contributor list (used when contributorSelection is "manual") */
-  manualContributors: Contributor[];
-
-  /** File patterns to include. Default: ["**\/*.ts", "**\/*.tsx", "**\/*.js", "**\/*.jsx"] */
-  include: string[];
-
-  /** File patterns to exclude. Default: ["**\/node_modules\/**", "**\/dist\/**"] */
-  exclude: string[];
-}
-
-/**
- * Fully resolved configuration with all values populated.
- * This is the config type used internally after loading and merging defaults.
- */
-export type ResolvedConfig = AnteConfig;
-
-/** Default configuration values */
-export const DEFAULT_CONFIG: AnteConfig = {
-  width: 100,
-  separatorChar: "-",
-  commentPrefix: "//",
-  nameColumn: 40,
-  emailColumn: 65,
-  licenseUrlColumn: 40,
-  maintainerColumn: 75,
-  spdxLicense: "MIT",
-  licenseUrl: "",
-  maintainerEmail: "",
-  maxContributors: 3,
-  contributorSelection: "commits",
-  manualContributors: [],
-  include: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
-  exclude: ["**/node_modules/**", "**/dist/**"],
+const LICENSE_URLS: Record<string, string> = {
+  "MIT": "https://opensource.org/licenses/MIT",
+  "MPL-2.0": "https://mozilla.org/MPL/2.0",
+  "Apache-2.0": "https://www.apache.org/licenses/LICENSE-2.0",
+  "GPL-3.0": "https://www.gnu.org/licenses/gpl-3.0.html",
+  "GPL-3.0-only": "https://www.gnu.org/licenses/gpl-3.0.html",
+  "GPL-3.0-or-later": "https://www.gnu.org/licenses/gpl-3.0.html",
+  "GPL-2.0": "https://www.gnu.org/licenses/gpl-2.0.html",
+  "GPL-2.0-only": "https://www.gnu.org/licenses/gpl-2.0.html",
+  "LGPL-3.0": "https://www.gnu.org/licenses/lgpl-3.0.html",
+  "LGPL-2.1": "https://www.gnu.org/licenses/lgpl-2.1.html",
+  "BSD-2-Clause": "https://opensource.org/licenses/BSD-2-Clause",
+  "BSD-3-Clause": "https://opensource.org/licenses/BSD-3-Clause",
+  "ISC": "https://opensource.org/licenses/ISC",
+  "Unlicense": "https://unlicense.org/",
+  "WTFPL": "http://www.wtfpl.net/",
+  "CC0-1.0": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "CC-BY-4.0": "https://creativecommons.org/licenses/by/4.0/",
+  "CC-BY-SA-4.0": "https://creativecommons.org/licenses/by-sa/4.0/",
+  "Zlib": "https://opensource.org/licenses/Zlib",
+  "BSL-1.0": "https://opensource.org/licenses/BSL-1.0",
 };
-
-/**
- * Loads configuration from a deno.json or package.json file.
- *
- * @param path - Optional path to config file. Searches upward if not provided.
- * @returns The loaded configuration merged with defaults.
- */
-export function loadConfig(_path?: string): Promise<AnteConfig> {
-  // TODO: Implement config file discovery and loading
-  return Promise.resolve({ ...DEFAULT_CONFIG });
-}
-
-/**
- * Resolves a partial configuration by merging with defaults.
- *
- * @param partial - Partial configuration object
- * @returns Complete configuration with defaults applied
- */
-export function resolveConfig(partial: Partial<AnteConfig>): AnteConfig {
-  return { ...DEFAULT_CONFIG, ...partial };
-}
 
 /**
  * Derives the license URL from an SPDX identifier.
@@ -136,15 +60,8 @@ export function resolveConfig(partial: Partial<AnteConfig>): AnteConfig {
  * @returns The canonical URL for that license
  */
 export function deriveLicenseUrl(spdx: string): string {
-  // TODO: Implement full SPDX -> URL mapping
-  const urls: Record<string, string> = {
-    "MIT": "https://opensource.org/licenses/MIT",
-    "MPL-2.0": "https://mozilla.org/MPL/2.0",
-    "Apache-2.0": "https://www.apache.org/licenses/LICENSE-2.0",
-    "GPL-3.0": "https://www.gnu.org/licenses/gpl-3.0.html",
-    "BSD-3-Clause": "https://opensource.org/licenses/BSD-3-Clause",
-  };
-  return urls[spdx] ?? `https://spdx.org/licenses/${spdx}.html`;
+  if (!spdx) return "";
+  return LICENSE_URLS[spdx] ?? `https://spdx.org/licenses/${spdx}.html`;
 }
 
 /**
@@ -168,4 +85,169 @@ export async function getGitConfig(key: string): Promise<string> {
     // Git not available or config not set
   }
   return "";
+}
+
+/**
+ * Builds list of directories from startDir up to root.
+ */
+function getDirectoryChain(startDir: string): string[] {
+  const dirs: string[] = [];
+  let currentDir = startDir;
+
+  while (true) {
+    dirs.push(currentDir);
+    const parentDir = currentDir.substring(0, currentDir.lastIndexOf("/"));
+    if (parentDir === currentDir || parentDir === "") {
+      break;
+    }
+    currentDir = parentDir;
+  }
+
+  return dirs;
+}
+
+/**
+ * Checks if a file exists and is a file (not directory).
+ */
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    const stat = await Deno.stat(path);
+    return stat.isFile;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Searches upward from a directory to find a config file.
+ *
+ * @param startDir - Directory to start searching from
+ * @param filenames - File names to look for
+ * @returns Path to the found file, or null if not found
+ */
+async function findConfigFile(
+  startDir: string,
+  filenames: string[],
+): Promise<string | null> {
+  const dirs = getDirectoryChain(startDir);
+
+  // Build all candidate paths
+  const allPaths: Array<{ dir: string; filename: string; path: string }> = [];
+  for (const dir of dirs) {
+    for (const filename of filenames) {
+      allPaths.push({ dir, filename, path: `${dir}/${filename}` });
+    }
+  }
+
+  // Check all paths in parallel
+  const results = await Promise.all(
+    allPaths.map(async (entry) => ({
+      ...entry,
+      exists: await fileExists(entry.path),
+    })),
+  );
+
+  // Find the first existing file, preferring earlier directories
+  for (const dir of dirs) {
+    for (const filename of filenames) {
+      const match = results.find(
+        (r) => r.dir === dir && r.filename === filename && r.exists,
+      );
+      if (match) {
+        return match.path;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Reads a JSON file and returns its parsed content.
+ */
+async function readJsonFile(path: string): Promise<Record<string, unknown>> {
+  const content = await Deno.readTextFile(path);
+  return JSON.parse(content);
+}
+
+/**
+ * Loads configuration from a deno.json or package.json file.
+ *
+ * Search order:
+ * 1. Explicit path if provided
+ * 2. deno.json in current directory or parents
+ * 3. deno.jsonc in current directory or parents
+ * 4. package.json in current directory or parents
+ *
+ * @param path - Optional explicit path to config file
+ * @returns The loaded configuration merged with defaults
+ */
+export async function loadConfig(path?: string): Promise<ResolvedConfig> {
+  let configPath: string | null = path ?? null;
+
+  if (!configPath) {
+    const cwd = Deno.cwd();
+    configPath = await findConfigFile(cwd, ["deno.json", "deno.jsonc", "package.json"]);
+  }
+
+  let partial: Partial<AnteConfig> = {};
+  let projectLicense: string | undefined;
+
+  if (configPath) {
+    try {
+      const json = await readJsonFile(configPath);
+
+      // Look for ante config section
+      if (json.ante && typeof json.ante === "object") {
+        partial = json.ante as Partial<AnteConfig>;
+      }
+
+      // Look for project license
+      if (json.license && typeof json.license === "string") {
+        projectLicense = json.license;
+      }
+    } catch {
+      // Failed to read config, use defaults
+    }
+  }
+
+  // Build resolved config
+  const resolved = resolveConfig(partial);
+
+  // Derive spdxLicense from project license if not explicitly set
+  if (!partial.spdxLicense && projectLicense) {
+    resolved.spdxLicense = projectLicense;
+  }
+
+  // Derive licenseUrl from spdxLicense if not explicitly set
+  if (!partial.licenseUrl && resolved.spdxLicense) {
+    resolved.licenseUrl = deriveLicenseUrl(resolved.spdxLicense);
+  }
+
+  // Derive maintainerEmail from git if not explicitly set
+  if (!partial.maintainerEmail) {
+    const email = await getGitConfig("user.email");
+    if (email) {
+      resolved.maintainerEmail = email;
+    }
+  }
+
+  return resolved;
+}
+
+/**
+ * Resolves a partial configuration by merging with defaults.
+ *
+ * @param partial - Partial configuration object
+ * @returns Complete configuration with defaults applied
+ */
+export function resolveConfig(partial: Partial<AnteConfig>): ResolvedConfig {
+  return {
+    ...DEFAULT_CONFIG,
+    ...partial,
+    // Ensure arrays are not undefined
+    manualContributors: partial.manualContributors ?? DEFAULT_CONFIG.manualContributors,
+    include: partial.include ?? DEFAULT_CONFIG.include,
+    exclude: partial.exclude ?? DEFAULT_CONFIG.exclude,
+  };
 }

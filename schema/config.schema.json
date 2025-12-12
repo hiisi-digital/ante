@@ -1,0 +1,141 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/hiisi-digital/ante/blob/main/schema/config.schema.json",
+  "title": "AnteConfig",
+  "description": "Configuration for ante copyright header management. This schema defines all available options for controlling how copyright headers are generated, formatted, and maintained in your source files.",
+  "type": "object",
+  "properties": {
+    "width": {
+      "type": "integer",
+      "default": 100,
+      "minimum": 60,
+      "maximum": 200,
+      "description": "Total line width for header lines, including the comment prefix. The separator lines and content will be padded/truncated to fit this width. Recommended values are 80 (traditional terminal width) or 100 (modern editors)."
+    },
+    "separatorChar": {
+      "type": "string",
+      "default": "-",
+      "minLength": 1,
+      "maxLength": 1,
+      "description": "The character used to build separator lines at the top and bottom of the header block. Common choices are '-', '=', or '*'."
+    },
+    "commentPrefix": {
+      "type": "string",
+      "default": "//",
+      "description": "The comment prefix to use for header lines. This should match the target language's line comment syntax. Examples: '//' for TypeScript/JavaScript/Rust, '#' for Python/Shell, '--' for Lua/SQL."
+    },
+    "nameColumn": {
+      "type": "integer",
+      "default": 40,
+      "minimum": 20,
+      "maximum": 100,
+      "description": "The column position (0-indexed) where contributor names should start in the copyright lines. Content before this position includes the copyright notice and year."
+    },
+    "emailColumn": {
+      "type": "integer",
+      "default": 65,
+      "minimum": 40,
+      "maximum": 150,
+      "description": "The column position (0-indexed) where contributor email addresses should start in the copyright lines. This should be greater than nameColumn to allow space for names."
+    },
+    "licenseUrlColumn": {
+      "type": "integer",
+      "default": 40,
+      "minimum": 20,
+      "maximum": 100,
+      "description": "The column position (0-indexed) where the license URL should start in the SPDX line. This is typically aligned with nameColumn for visual consistency."
+    },
+    "maintainerColumn": {
+      "type": "integer",
+      "default": 75,
+      "minimum": 50,
+      "maximum": 150,
+      "description": "The column position (0-indexed) where the maintainer contact should start in the SPDX line. This appears after the license URL."
+    },
+    "spdxLicense": {
+      "type": "string",
+      "description": "The SPDX license identifier to include in headers. If not specified, this is derived from the 'license' field in your deno.json or package.json. See https://spdx.org/licenses/ for valid identifiers.",
+      "examples": ["MIT", "MPL-2.0", "Apache-2.0", "GPL-3.0-only", "BSD-3-Clause"]
+    },
+    "licenseUrl": {
+      "type": "string",
+      "format": "uri",
+      "description": "The URL pointing to the license text. If not specified, this is automatically derived from the spdxLicense. For example, 'MPL-2.0' becomes 'https://mozilla.org/MPL/2.0'.",
+      "examples": [
+        "https://mozilla.org/MPL/2.0",
+        "https://opensource.org/licenses/MIT",
+        "https://www.apache.org/licenses/LICENSE-2.0"
+      ]
+    },
+    "maintainerEmail": {
+      "type": "string",
+      "format": "email",
+      "description": "The contact email for the project maintainer, displayed in the SPDX line. If not specified, this is read from git config user.email. This is typically a project or organization email, not a personal contributor email.",
+      "examples": ["contact@example.com", "oss@company.org"]
+    },
+    "maxContributors": {
+      "type": "integer",
+      "default": 3,
+      "minimum": 1,
+      "maximum": 10,
+      "description": "Maximum number of contributors to display in the header. When a file has more contributors than this limit, only the top N (by the chosen strategy) are shown. Set to 1 for single-author headers."
+    },
+    "contributorSelection": {
+      "type": "string",
+      "enum": ["commits", "lines", "recent", "manual"],
+      "default": "commits",
+      "description": "Strategy for selecting which contributors to display when a file has more contributors than maxContributors. Options:\n- 'commits': Contributors with the most commits touching this file\n- 'lines': Contributors who changed the most lines in this file\n- 'recent': Most recent contributors to this file\n- 'manual': Use the manualContributors list instead of git history"
+    },
+    "manualContributors": {
+      "type": "array",
+      "default": [],
+      "description": "Explicit list of contributors to use when contributorSelection is 'manual'. This bypasses git history entirely. Useful for files that were migrated from another repository or for organization-level attribution.",
+      "items": {
+        "type": "object",
+        "required": ["name", "email"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contributor's display name as it should appear in headers."
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "The contributor's email address."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "include": {
+      "type": "array",
+      "default": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
+      "description": "Glob patterns for files that should have copyright headers. Files matching any of these patterns will be processed by ante. Use standard glob syntax with '**' for recursive matching.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "examples": [
+        ["**/*.ts", "**/*.tsx"],
+        ["src/**/*.js", "lib/**/*.js"],
+        ["**/*.rs"]
+      ]
+    },
+    "exclude": {
+      "type": "array",
+      "default": ["**/node_modules/**", "**/dist/**", "**/build/**", "**/coverage/**"],
+      "description": "Glob patterns for files to exclude from processing. Files matching any of these patterns will be skipped, even if they match an include pattern. Exclude patterns take precedence over include patterns.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "examples": [
+        ["**/node_modules/**", "**/dist/**"],
+        ["**/generated/**", "**/vendor/**"],
+        ["**/*.d.ts", "**/*.min.js"]
+      ]
+    }
+  },
+  "additionalProperties": false
+}
