@@ -13,8 +13,7 @@
  * - Validating header format and content
  */
 
-import type { ResolvedConfig } from "./config.ts";
-import type { Contributor } from "./contributors.ts";
+import type { Contributor, ResolvedConfig } from "./config.ts";
 
 /**
  * Represents a parsed copyright header.
