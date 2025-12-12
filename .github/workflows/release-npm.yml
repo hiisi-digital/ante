@@ -1,0 +1,126 @@
+name: Release to npm
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Perform a dry run (don't actually publish)"
+        required: false
+        default: "true"
+        type: boolean
+
+env:
+  # Package naming strategy:
+  # - npm: unscoped "ante-cli" (since "ante" is squatted)
+  # - The binary command is still "ante"
+  NPM_PACKAGE_NAME: ante-cli
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write # Required for npm provenance
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Verify version matches tag
+        if: github.event_name == 'push'
+        run: |
+          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+          PKG_VERSION=$(deno eval "const c = JSON.parse(Deno.readTextFileSync('deno.json')); console.log(c.version)")
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag version ($TAG_VERSION) does not match package version ($PKG_VERSION)"
+            echo "Please update deno.json version to match the tag."
+            exit 1
+          fi
+          echo "Version verified: $TAG_VERSION"
+          echo "VERSION=$TAG_VERSION" >> $GITHUB_ENV
+
+      - name: Run tests
+        run: deno test --allow-read --allow-write --allow-env --allow-run
+
+      - name: Build npm package
+        run: deno run -A scripts/build-npm.ts
+
+      - name: Verify build output
+        run: |
+          echo "Checking build output..."
+          if [ ! -f "./npm/package.json" ]; then
+            echo "::error::package.json not found in npm directory"
+            exit 1
+          fi
+          if [ ! -f "./npm/esm/cli/mod.js" ]; then
+            echo "::error::CLI entry point not found"
+            exit 1
+          fi
+          # Verify shebang is present for binary
+          if ! head -1 ./npm/esm/cli/mod.js | grep -q "#!/usr/bin/env node"; then
+            echo "::error::CLI entry point missing shebang"
+            exit 1
+          fi
+          echo "Build verification passed"
+          echo "Package contents:"
+          ls -la ./npm/
+
+      - name: Check if version already published
+        id: check_version
+        working-directory: ./npm
+        run: |
+          PKG_NAME=$(jq -r '.name' package.json)
+          PKG_VERSION=$(jq -r '.version' package.json)
+          echo "Checking if $PKG_NAME@$PKG_VERSION exists on npm..."
+          
+          if npm view "$PKG_NAME@$PKG_VERSION" version 2>/dev/null; then
+            echo "::warning::Version $PKG_VERSION already published to npm"
+            echo "already_published=true" >> $GITHUB_OUTPUT
+          else
+            echo "Version $PKG_VERSION not yet published"
+            echo "already_published=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Publish to npm (dry run)
+        if: github.event.inputs.dry_run == 'true' || steps.check_version.outputs.already_published == 'true'
+        working-directory: ./npm
+        run: |
+          echo "Performing dry run..."
+          npm publish --dry-run --access public
+          echo "Dry run completed. No package was published."
+
+      - name: Publish to npm
+        if: github.event.inputs.dry_run != 'true' && steps.check_version.outputs.already_published != 'true'
+        working-directory: ./npm
+        run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Post-publish verification
+        if: github.event.inputs.dry_run != 'true' && steps.check_version.outputs.already_published != 'true'
+        run: |
+          echo "Waiting for npm to index the package..."
+          sleep 10
+          PKG_VERSION=$(jq -r '.version' ./npm/package.json)
+          echo "Verifying ${{ env.NPM_PACKAGE_NAME }}@$PKG_VERSION is available..."
+          npm view "${{ env.NPM_PACKAGE_NAME }}@$PKG_VERSION" version || echo "::warning::Package may not be indexed yet"
+          echo ""
+          echo "Install with:"
+          echo "  npm install -g ${{ env.NPM_PACKAGE_NAME }}"
+          echo "  ante --help"

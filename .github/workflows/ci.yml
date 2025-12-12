@@ -32,7 +32,7 @@ jobs:
         run: deno check mod.ts
 
       - name: Run tests
-        run: deno test --allow-read --allow-env --allow-run
+        run: deno test --allow-read --allow-write --allow-env --allow-run
 
       - name: Dry run publish
         run: deno publish --dry-run
