@@ -32,62 +32,71 @@ characters, and contributor selection strategy are all controlled through your
 
 ## Installation
 
-### CLI (recommended)
-
 ```bash
-# npm (Node.js 18+)
+# npm / yarn / pnpm (Node.js 18+)
 npm install -g ante-cli
+yarn global add ante-cli
+pnpm add -g ante-cli
 
-# Then use:
-ante init
-ante check
-ante fix
+# Deno
+deno install -gAf jsr:@loru/ante/cli
+
+# Or run directly without installing
+deno run -A jsr:@loru/ante/cli <command>
+npx ante-cli <command>
 ```
 
-### Deno
+As a library:
 
 ```typescript
+// Deno / JSR
 import { generateHeader, loadConfig } from "jsr:@loru/ante";
+
+// Node.js
+import { generateHeader, loadConfig } from "ante-cli";
 ```
 
-Or in `deno.json`:
+Or add to your project:
 
-```json
+```jsonc
+// deno.json
 {
   "imports": {
-    "@loru/ante": "jsr:@loru/ante@^0.1.0"
+    "@loru/ante": "jsr:@loru/ante@^0.1"
   }
 }
-```
 
-Run directly without installing:
-
-```bash
-deno run -A jsr:@loru/ante/cli init
+// package.json
+{
+  "devDependencies": {
+    "ante-cli": "^0.1"
+  }
+}
 ```
 
 ## CLI Usage
 
 ```bash
-# Set up config and install git hooks
-ante init
-
-# Check if files have valid headers (exits non-zero if issues found)
-ante check
-
-# Fix all headers to match config
-ante fix
-
-# Add header to a specific file
-ante add src/new-file.ts
-
-# Show help
-ante --help
+ante init                  # Set up config and install git hooks
+ante check                 # Verify headers (exits non-zero if issues found)
+ante check "src/**/*.ts"   # Check specific files
+ante fix                   # Fix all headers to match config
+ante add src/new-file.ts   # Add header to a specific file
+ante --help                # Show help
 ```
 
-Or add tasks to your `deno.json` / `package.json`:
+Add to your project scripts:
 
-```json
+```jsonc
+// deno.json
+{
+  "tasks": {
+    "copyright:check": "deno run -A jsr:@loru/ante/cli check",
+    "copyright:fix": "deno run -A jsr:@loru/ante/cli fix"
+  }
+}
+
+// package.json
 {
   "scripts": {
     "copyright:check": "ante check",
@@ -98,7 +107,7 @@ Or add tasks to your `deno.json` / `package.json`:
 
 ## Configuration
 
-Add an `ante` section to your `deno.json`:
+Add an `ante` section to your `deno.json` or `package.json`:
 
 ```json
 {
@@ -115,7 +124,7 @@ Add an `ante` section to your `deno.json`:
 }
 ```
 
-Most values have sensible defaults. The `license` field from your `deno.json` is
+Most values have sensible defaults. The `license` field from your config file is
 used to derive `spdxLicense` and `licenseUrl` automatically.
 
 ### Configuration Options
@@ -150,9 +159,9 @@ used to derive `spdxLicense` and `licenseUrl` automatically.
 ## Library API
 
 ```typescript
-import { generateHeader, hasValidHeader, loadConfig, parseHeader, resolveConfig } from "@loru/ante";
+import { generateHeader, hasValidHeader, loadConfig, parseHeader, resolveConfig } from "@loru/ante"; // or "ante-cli" for Node.js
 
-// Load config from deno.json
+// Load config from deno.json / package.json
 const config = await loadConfig();
 
 // Check if a file has a header
@@ -175,10 +184,10 @@ The `init` command installs a pre-commit hook that:
 5. Stages the changes automatically
 
 ```bash
-deno run -A jsr:@loru/ante/cli init
+ante init
 ```
 
-This writes hook scripts to `.githooks/` and runs `git config core.hooksPath .githooks`.
+This writes hook scripts to `.githooks/` and configures git to use them.
 
 ## Year Handling
 
