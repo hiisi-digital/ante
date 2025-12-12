@@ -10,6 +10,8 @@ jobs:
   compat:
     name: Check Runtimes
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository
@@ -21,7 +23,16 @@ jobs:
           deno-version: v2.x
 
       - name: 🦕 Test in Deno (Source)
+        id: deno_js
+        continue-on-error: true
         run: deno run --allow-read tests/smoke.js
+
+      - name: 🦕 Test Types in Deno (Source)
+        id: deno_ts
+        continue-on-error: true
+        run: |
+          deno check tests/types.ts
+          deno run --allow-read tests/types.ts
 
       - name: Build npm package
         run: deno run -A scripts/build-npm.ts
@@ -36,15 +47,90 @@ jobs:
         with:
           bun-version: "latest"
 
-      - name: Create Package Test Runner
+      - name: Create Package Test Runners
         run: |
           # Create a version of the smoke test that imports from the built package
           # We use the ESM output from the npm build to verify Node/Bun consumption
           cp tests/smoke.js tests/smoke-pkg.mjs
           sed -i 's|../mod.ts|../npm/esm/mod.js|g' tests/smoke-pkg.mjs
+          
+          cp tests/types.ts tests/types-pkg.ts
+          sed -i 's|../mod.ts|../npm/esm/mod.js|g' tests/types-pkg.ts
 
       - name: 🐢 Test in Node.js (Built Package)
+        id: node_js
+        continue-on-error: true
         run: node tests/smoke-pkg.mjs
 
+      - name: 🐢 Test Types in Node.js (Built Package)
+        id: node_ts
+        continue-on-error: true
+        run: |
+          npm init -y
+          npm install typescript @types/node tsx
+          # Check types
+          npx tsc tests/types-pkg.ts --target es2022 --moduleResolution node --allowSyntheticDefaultImports --noEmit
+          # Run logic
+          npx tsx tests/types-pkg.ts
+
       - name: 🧅 Test in Bun (Built Package)
+        id: bun_js
+        continue-on-error: true
         run: bun run tests/smoke-pkg.mjs
+
+      - name: 🧅 Test Types in Bun (Built Package)
+        id: bun_ts
+        continue-on-error: true
+        run: bun run tests/types-pkg.ts
+
+      - name: Generate Compatibility Matrix
+        id: matrix
+        run: |
+          echo "## Runtime Compatibility Matrix" > COMPATIBILITY.md
+          echo "" >> COMPATIBILITY.md
+          echo "Current status of runtime support tests:" >> COMPATIBILITY.md
+          echo "" >> COMPATIBILITY.md
+          echo "| Runtime | JavaScript (Smoke) | TypeScript (Types + Smoke) |" >> COMPATIBILITY.md
+          echo "| :--- | :---: | :---: |" >> COMPATIBILITY.md
+          
+          DENO_JS="${{ steps.deno_js.outcome == 'success' && '✅' || '❌' }}"
+          DENO_TS="${{ steps.deno_ts.outcome == 'success' && '✅' || '❌' }}"
+          echo "| **Deno** | $DENO_JS | $DENO_TS |" >> COMPATIBILITY.md
+          
+          NODE_JS="${{ steps.node_js.outcome == 'success' && '✅' || '❌' }}"
+          NODE_TS="${{ steps.node_ts.outcome == 'success' && '✅' || '❌' }}"
+          echo "| **Node.js** | $NODE_JS | $NODE_TS |" >> COMPATIBILITY.md
+
+          BUN_JS="${{ steps.bun_js.outcome == 'success' && '✅' || '❌' }}"
+          BUN_TS="${{ steps.bun_ts.outcome == 'success' && '✅' || '❌' }}"
+          echo "| **Bun** | $BUN_JS | $BUN_TS |" >> COMPATIBILITY.md
+          
+          echo "" >> COMPATIBILITY.md
+          echo "_Last updated: $(date -u)_" >> COMPATIBILITY.md
+          
+          cat COMPATIBILITY.md
+
+      - name: Update README and Push
+        if: github.event_name != 'pull_request'
+        run: |
+          # Configure git
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Replace existing section (assuming it's at the bottom) or append
+          if ! grep -q "## Runtime Compatibility Matrix" README.md; then
+            echo "" >> README.md
+            cat COMPATIBILITY.md >> README.md
+          else
+             # Delete from the header to the end of file, then append new
+             sed -i '/## Runtime Compatibility Matrix/,$d' README.md
+             cat COMPATIBILITY.md >> README.md
+          fi
+          
+          git add README.md COMPATIBILITY.md
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "docs: update runtime compatibility matrix"
+            git push
+          fi
