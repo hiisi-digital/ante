@@ -1,6 +1,6 @@
 {
   "name": "@hiisi/ante",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "license": "MPL-2.0",
   "exports": "./mod.ts",
   "imports": {
@@ -78,10 +78,11 @@
       "core/mod.ts",
       "core/config.ts",
       "core/config.generated.ts",
-      "core/version.ts",
-      "core/header.ts",
-      "core/formatter.ts",
       "core/contributors.ts",
+      "core/formatter.ts",
+      "core/glob.ts",
+      "core/header.ts",
+      "core/version.ts",
       "git/mod.ts",
       "git/hooks.ts",
       "git/history.ts",

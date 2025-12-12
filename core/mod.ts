@@ -17,5 +17,6 @@
 export * from "./config.ts";
 export * from "./contributors.ts";
 export * from "./formatter.ts";
+export * from "./glob.ts";
 export * from "./header.ts";
 export { VERSION } from "./version.ts";

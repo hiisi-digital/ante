@@ -1,5 +1,6 @@
 //----------------------------------------------------------------------------------------------------
 // Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+//                                      orgrinrt                 ort@hiisi.digital
 // SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
 //----------------------------------------------------------------------------------------------------
 
@@ -311,7 +312,32 @@ export function validateHeader(
 }
 
 /**
+ * Checks if content starts with a shebang line.
+ *
+ * @param content - The file content to check
+ * @returns The shebang line if present, or null
+ */
+function extractShebang(content: string): { shebang: string; rest: string } | null {
+  if (content.startsWith("#!")) {
+    const newlineIndex = content.indexOf("\n");
+    if (newlineIndex === -1) {
+      return { shebang: content, rest: "" };
+    }
+    return {
+      shebang: content.slice(0, newlineIndex),
+      rest: content.slice(newlineIndex + 1),
+    };
+  }
+  return null;
+}
+
+/**
  * Replaces or prepends a header in file content.
+ *
+ * Handles special cases:
+ * - Shebang lines (#!) are preserved at the very top of the file
+ * - Existing headers are replaced in-place
+ * - New headers are inserted after any shebang
  *
  * @param content - The original file content
  * @param newHeader - The new header to insert
@@ -319,6 +345,30 @@ export function validateHeader(
  * @returns The updated file content
  */
 export function replaceHeader(
+  content: string,
+  newHeader: string,
+  existingHeader?: ParsedHeader,
+): string {
+  // Handle shebang preservation
+  const shebangResult = extractShebang(content);
+
+  if (shebangResult) {
+    // File has a shebang - process the rest and prepend shebang at the end
+    const restWithHeader = replaceHeaderInContent(
+      shebangResult.rest,
+      newHeader,
+      existingHeader,
+    );
+    return shebangResult.shebang + "\n" + restWithHeader;
+  }
+
+  return replaceHeaderInContent(content, newHeader, existingHeader);
+}
+
+/**
+ * Internal function to replace header without shebang handling.
+ */
+function replaceHeaderInContent(
   content: string,
   newHeader: string,
   existingHeader?: ParsedHeader,

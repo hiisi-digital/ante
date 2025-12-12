@@ -1,5 +1,6 @@
 //----------------------------------------------------------------------------------------------------
 // Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+//                                      orgrinrt                 ort@hiisi.digital
 // SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
 //----------------------------------------------------------------------------------------------------
 
@@ -11,7 +12,7 @@
  */
 
 import type { ResolvedConfig } from "#core";
-import { hasValidHeader, validateHeader } from "#core";
+import { hasValidHeader, matchesGlob, validateHeader } from "#core";
 
 /**
  * Options for the check command.
@@ -52,55 +53,10 @@ export interface CheckResult {
 }
 
 /**
- * Expands glob patterns to file paths.
+ * Checks if a path matches any of the given patterns.
  */
-async function expandGlobs(
-  patterns: string[],
-  excludePatterns: string[],
-): Promise<string[]> {
-  const files: string[] = [];
-
-  for (const pattern of patterns) {
-    try {
-      // Use Deno's glob expansion
-      for await (const entry of Deno.readDir(".")) {
-        if (entry.isFile && entry.name.endsWith(".ts")) {
-          // Check if excluded
-          let excluded = false;
-          for (const exclude of excludePatterns) {
-            if (matchesPattern(entry.name, exclude)) {
-              excluded = true;
-              break;
-            }
-          }
-          if (!excluded && matchesPattern(entry.name, pattern)) {
-            files.push(entry.name);
-          }
-        }
-      }
-    } catch {
-      // Directory read failed
-    }
-  }
-
-  // Also recursively search directories
-  const allFiles = await findFilesRecursive(".", patterns, excludePatterns);
-  return [...new Set([...files, ...allFiles])];
-}
-
-/**
- * Simple pattern matching (supports * and **).
- */
-function matchesPattern(path: string, pattern: string): boolean {
-  // Convert glob pattern to regex
-  const regexPattern = pattern
-    .replace(/\*\*/g, "<<<GLOBSTAR>>>")
-    .replace(/\*/g, "[^/]*")
-    .replace(/<<<GLOBSTAR>>>/g, ".*")
-    .replace(/\?/g, ".");
-
-  const regex = new RegExp(`^${regexPattern}$`);
-  return regex.test(path);
+function matchesAnyPattern(path: string, patterns: string[]): boolean {
+  return patterns.some((pattern) => matchesGlob(path, pattern));
 }
 
 /**
@@ -118,19 +74,15 @@ async function findFilesRecursive(
       const path = dir === "." ? entry.name : `${dir}/${entry.name}`;
 
       // Check if path is excluded
-      let excluded = false;
-      for (const pattern of excludePatterns) {
-        if (matchesPattern(path, pattern)) {
-          excluded = true;
-          break;
-        }
-      }
-
-      if (excluded) {
+      if (matchesAnyPattern(path, excludePatterns)) {
         continue;
       }
 
       if (entry.isDirectory) {
+        // Skip hidden directories
+        if (entry.name.startsWith(".")) {
+          continue;
+        }
         const subFiles = await findFilesRecursive(
           path,
           includePatterns,
@@ -138,19 +90,27 @@ async function findFilesRecursive(
         );
         files.push(...subFiles);
       } else if (entry.isFile) {
-        for (const pattern of includePatterns) {
-          if (matchesPattern(path, pattern)) {
-            files.push(path);
-            break;
-          }
+        if (matchesAnyPattern(path, includePatterns)) {
+          files.push(path);
         }
       }
     }
   } catch {
-    // Directory read failed
+    // Directory read failed - skip silently
   }
 
   return files;
+}
+
+/**
+ * Expands glob patterns to file paths.
+ */
+function expandGlobs(
+  patterns: string[],
+  excludePatterns: string[],
+): Promise<string[]> {
+  // Recursively search from current directory
+  return findFilesRecursive(".", patterns, excludePatterns);
 }
 
 /**
@@ -254,8 +214,6 @@ export async function runCheck(
  * Entry point when run as CLI command.
  */
 export async function main(args: string[]): Promise<void> {
-  // This is handled by the main CLI dispatcher
-  // Parse args locally if needed
   const glob = args[0];
 
   // Load config and run check
