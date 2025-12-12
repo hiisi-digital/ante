@@ -65,8 +65,8 @@ export const DEFAULT_CONFIG: Required<AnteConfig> = {
   maxContributors: 3,
   contributorSelection: "commits",
   manualContributors: [],
-  include: ["** /*.ts", "** /*.tsx", "** /*.js", "** /*.jsx"],
-  exclude: ["** /node_modules/**", "** /dist/**", "** /build/**", "** /coverage/**"],
+  include: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
+  exclude: ["**/node_modules/**", "**/dist/**", "**/build/**", "**/coverage/**"],
 };
 
 /** Fully resolved configuration with all values populated. */

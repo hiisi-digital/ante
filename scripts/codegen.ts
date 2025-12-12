@@ -86,16 +86,19 @@ function truncateDescription(str: string, maxLength = 60): string {
   return cleaned.substring(0, maxLength - 3) + "...";
 }
 
-function formatDefault(value: unknown): string {
+function formatDefault(value: unknown, escapeForJsDoc = false): string {
   if (value === undefined) return "undefined";
   if (typeof value === "string") {
-    // Escape */ sequences that would break JSDoc comments
-    const escaped = value.replace(/\*\//g, "* /");
-    return `"${escaped}"`;
+    if (escapeForJsDoc) {
+      // Escape */ sequences that would break JSDoc comments
+      const escaped = value.replace(/\*\//g, "* /");
+      return `"${escaped}"`;
+    }
+    return `"${value}"`;
   }
   if (Array.isArray(value)) {
     if (value.length === 0) return "[]";
-    return `[${value.map((v) => formatDefault(v)).join(", ")}]`;
+    return `[${value.map((v) => formatDefault(v, escapeForJsDoc)).join(", ")}]`;
   }
   return JSON.stringify(value);
 }
@@ -156,7 +159,7 @@ async function main(): Promise<void> {
     }
     // Skip defaults for arrays to avoid */" patterns breaking JSDoc
     if (prop.default !== undefined && prop.type !== "array") {
-      const defaultStr = formatDefault(prop.default);
+      const defaultStr = formatDefault(prop.default, true);
       if (comment) {
         comment += ` @default ${defaultStr}`;
       } else {
