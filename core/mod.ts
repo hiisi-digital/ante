@@ -1,5 +1,6 @@
 //----------------------------------------------------------------------------------------------------
 // Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+//                                      orgrinrt                 ort@hiisi.digital
 // SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
 //----------------------------------------------------------------------------------------------------
 
@@ -17,3 +18,4 @@ export * from "./config.ts";
 export * from "./contributors.ts";
 export * from "./formatter.ts";
 export * from "./header.ts";
+export { VERSION } from "./version.ts";

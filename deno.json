@@ -78,6 +78,7 @@
       "core/mod.ts",
       "core/config.ts",
       "core/config.generated.ts",
+      "core/version.ts",
       "core/header.ts",
       "core/formatter.ts",
       "core/contributors.ts",

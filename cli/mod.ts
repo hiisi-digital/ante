@@ -1,5 +1,6 @@
 //----------------------------------------------------------------------------------------------------
 // Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+//                                      orgrinrt                 ort@hiisi.digital
 // SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
 //----------------------------------------------------------------------------------------------------
 
@@ -13,14 +14,13 @@
  * - add: Add header to a specific file
  */
 
-import { loadConfig } from "#core";
+import { loadConfig, VERSION } from "#core";
 import { add } from "./commands/add.ts";
 import { runCheck } from "./commands/check.ts";
 import { runFix } from "./commands/fix.ts";
 import { runInit } from "./commands/init.ts";
 
-/** CLI version - should match deno.json */
-const VERSION = "0.1.0";
+// VERSION is imported from #core and read from deno.json
 
 /** Available commands */
 type Command = "init" | "check" | "fix" | "add" | "help" | "version";
