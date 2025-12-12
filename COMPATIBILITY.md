@@ -8,11 +8,11 @@ This document shows the compatibility status of `@hiisi/ante` across different J
 
 **Overall:** 1/8 runtime versions passing
 
-| Category | Description |
-|----------|-------------|
-| **Smoke** | Basic import and function call verification |
-| **Types** | TypeScript type definitions work correctly |
-| **Test Suite** | Full unit test suite passes |
+| Category       | Description                                 |
+| -------------- | ------------------------------------------- |
+| **Smoke**      | Basic import and function call verification |
+| **Types**      | TypeScript type definitions work correctly  |
+| **Test Suite** | Full unit test suite passes                 |
 
 |---------|--------|:-----:|:-----:|:----------:|
 | v1.x | 1.46.3 | ❌ | ❌ | ❌ |
@@ -20,19 +20,19 @@ This document shows the compatibility status of `@hiisi/ante` across different J
 
 ## Node.js
 
-| Version | Actual | Smoke | Types | Test Suite |
-|---------|--------|:-----:|:-----:|:----------:|
-| 18 | v18.20.8 | ✅ | ❌ | ❌ |
-| 20 | v20.19.6 | ✅ | ❌ | ❌ |
-| 22 | v22.21.1 | ✅ | ❌ | ❌ |
+| Version | Actual   | Smoke | Types | Test Suite |
+| ------- | -------- | :---: | :---: | :--------: |
+| 18      | v18.20.8 |  ✅   |  ❌   |     ❌     |
+| 20      | v20.19.6 |  ✅   |  ❌   |     ❌     |
+| 22      | v22.21.1 |  ✅   |  ❌   |     ❌     |
 
 ## Bun
 
 | Version | Actual | Smoke | Types | Test Suite |
-|---------|--------|:-----:|:-----:|:----------:|
-| 1.0.0 | 1.0.0 | ✅ | ❌ | ❌ |
-| 1.1.0 | 1.1.0 | ✅ | ❌ | ❌ |
-| latest | 1.3.4 | ✅ | ❌ | ❌ |
+| ------- | ------ | :---: | :---: | :--------: |
+| 1.0.0   | 1.0.0  |  ✅   |  ❌   |     ❌     |
+| 1.1.0   | 1.1.0  |  ✅   |  ❌   |     ❌     |
+| latest  | 1.3.4  |  ✅   |  ❌   |     ❌     |
 
 ---
 

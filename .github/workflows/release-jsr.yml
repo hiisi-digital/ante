@@ -65,7 +65,10 @@ jobs:
         run: deno check mod.ts
 
       - name: Run tests
-        run: deno test --allow-read --allow-write --allow-env --allow-run
+        run: |
+          deno test --allow-read --allow-write --allow-env --allow-run \
+            --ignore=tests/node/ \
+            --ignore=tests/deno/
 
       - name: Verify publish configuration
         run: |

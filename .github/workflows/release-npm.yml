@@ -58,7 +58,10 @@ jobs:
           echo "VERSION=$TAG_VERSION" >> $GITHUB_ENV
 
       - name: Run tests
-        run: deno test --allow-read --allow-write --allow-env --allow-run
+        run: |
+          deno test --allow-read --allow-write --allow-env --allow-run \
+            --ignore=tests/node/ \
+            --ignore=tests/deno/
 
       - name: Build npm package
         run: deno run -A scripts/build-npm.ts
