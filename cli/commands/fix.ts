@@ -1,5 +1,6 @@
 //----------------------------------------------------------------------------------------------------
 // Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+//                                      orgrinrt                 ort@hiisi.digital
 // SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
 //----------------------------------------------------------------------------------------------------
 
@@ -16,6 +17,7 @@ import {
   getCurrentGitUser,
   getFileYearRange,
   hasValidHeader,
+  matchesGlob,
   parseHeader,
   replaceHeader,
   updateHeader,
@@ -48,17 +50,10 @@ export interface FixResult {
 }
 
 /**
- * Simple pattern matching (supports * and **).
+ * Checks if a path matches any of the given patterns.
  */
-function matchesPattern(path: string, pattern: string): boolean {
-  const regexPattern = pattern
-    .replace(/\*\*/g, "<<<GLOBSTAR>>>")
-    .replace(/\*/g, "[^/]*")
-    .replace(/<<<GLOBSTAR>>>/g, ".*")
-    .replace(/\?/g, ".");
-
-  const regex = new RegExp(`^${regexPattern}$`);
-  return regex.test(path);
+function matchesAnyPattern(path: string, patterns: string[]): boolean {
+  return patterns.some((pattern) => matchesGlob(path, pattern));
 }
 
 /**
@@ -76,19 +71,15 @@ async function findFilesRecursive(
       const path = dir === "." ? entry.name : `${dir}/${entry.name}`;
 
       // Check if path is excluded
-      let excluded = false;
-      for (const pattern of excludePatterns) {
-        if (matchesPattern(path, pattern)) {
-          excluded = true;
-          break;
-        }
-      }
-
-      if (excluded) {
+      if (matchesAnyPattern(path, excludePatterns)) {
         continue;
       }
 
       if (entry.isDirectory) {
+        // Skip hidden directories
+        if (entry.name.startsWith(".")) {
+          continue;
+        }
         const subFiles = await findFilesRecursive(
           path,
           includePatterns,
@@ -96,16 +87,13 @@ async function findFilesRecursive(
         );
         files.push(...subFiles);
       } else if (entry.isFile) {
-        for (const pattern of includePatterns) {
-          if (matchesPattern(path, pattern)) {
-            files.push(path);
-            break;
-          }
+        if (matchesAnyPattern(path, includePatterns)) {
+          files.push(path);
         }
       }
     }
   } catch {
-    // Directory read failed
+    // Directory read failed - skip silently
   }
 
   return files;

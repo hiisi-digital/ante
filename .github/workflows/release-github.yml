@@ -1,0 +1,138 @@
+name: Create GitHub Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to create release for (e.g., v0.1.5)"
+        required: true
+        type: string
+      draft:
+        description: "Create as draft release"
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write # Required to create releases
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch full history for changelog generation
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Determine tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+          echo "Using tag: $TAG"
+
+      - name: Extract package info
+        id: package
+        run: |
+          PKG_VERSION=$(deno eval "const c = JSON.parse(Deno.readTextFileSync('deno.json')); console.log(c.version)")
+          PKG_NAME=$(deno eval "const c = JSON.parse(Deno.readTextFileSync('deno.json')); console.log(c.name)")
+          echo "version=$PKG_VERSION" >> $GITHUB_OUTPUT
+          echo "name=$PKG_NAME" >> $GITHUB_OUTPUT
+
+      - name: Verify version matches tag
+        run: |
+          TAG_VERSION="${{ steps.tag.outputs.version }}"
+          PKG_VERSION="${{ steps.package.outputs.version }}"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag version ($TAG_VERSION) does not match package version ($PKG_VERSION)"
+            exit 1
+          fi
+          echo "Version verified: $TAG_VERSION"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get the previous tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          CURRENT_TAG="${{ steps.tag.outputs.tag }}"
+          
+          echo "Previous tag: $PREV_TAG"
+          echo "Current tag: $CURRENT_TAG"
+          
+          # Generate changelog
+          CHANGELOG_FILE=$(mktemp)
+          
+          echo "## What's Changed" > "$CHANGELOG_FILE"
+          echo "" >> "$CHANGELOG_FILE"
+          
+          if [ -n "$PREV_TAG" ]; then
+            # Get commits between tags
+            git log --pretty=format:"- %s (%h)" "$PREV_TAG".."$CURRENT_TAG" >> "$CHANGELOG_FILE" || true
+          else
+            # First release - get all commits
+            git log --pretty=format:"- %s (%h)" >> "$CHANGELOG_FILE" || true
+          fi
+          
+          echo "" >> "$CHANGELOG_FILE"
+          echo "" >> "$CHANGELOG_FILE"
+          echo "## Installation" >> "$CHANGELOG_FILE"
+          echo "" >> "$CHANGELOG_FILE"
+          echo "### Deno (JSR)" >> "$CHANGELOG_FILE"
+          echo '```ts' >> "$CHANGELOG_FILE"
+          echo 'import { ... } from "jsr:${{ steps.package.outputs.name }}@${{ steps.package.outputs.version }}";' >> "$CHANGELOG_FILE"
+          echo '```' >> "$CHANGELOG_FILE"
+          echo "" >> "$CHANGELOG_FILE"
+          echo "### Node.js (npm)" >> "$CHANGELOG_FILE"
+          echo '```bash' >> "$CHANGELOG_FILE"
+          echo 'npm install -g ante-cli' >> "$CHANGELOG_FILE"
+          echo '```' >> "$CHANGELOG_FILE"
+          echo "" >> "$CHANGELOG_FILE"
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG:-$(git rev-list --max-parents=0 HEAD)}...$CURRENT_TAG" >> "$CHANGELOG_FILE"
+          
+          # Output for use in release
+          echo "file=$CHANGELOG_FILE" >> $GITHUB_OUTPUT
+          
+          # Show changelog
+          echo "Generated changelog:"
+          cat "$CHANGELOG_FILE"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: ${{ steps.tag.outputs.tag }}
+          body_path: ${{ steps.changelog.outputs.file }}
+          draft: ${{ github.event.inputs.draft || false }}
+          prerelease: ${{ contains(steps.tag.outputs.tag, '-alpha') || contains(steps.tag.outputs.tag, '-beta') || contains(steps.tag.outputs.tag, '-rc') }}
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release summary
+        run: |
+          echo "## Release Created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag**: ${{ steps.tag.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: ${{ steps.package.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Package**: ${{ steps.package.outputs.name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Links" >> $GITHUB_STEP_SUMMARY
+          echo "- [GitHub Release](https://github.com/${{ github.repository }}/releases/tag/${{ steps.tag.outputs.tag }})" >> $GITHUB_STEP_SUMMARY
+          echo "- [JSR Package](https://jsr.io/${{ steps.package.outputs.name }})" >> $GITHUB_STEP_SUMMARY
+          echo "- [npm Package](https://www.npmjs.com/package/ante-cli)" >> $GITHUB_STEP_SUMMARY
