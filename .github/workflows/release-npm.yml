@@ -109,7 +109,9 @@ jobs:
         working-directory: ./npm
         # Using npm's trusted publishing (OIDC) - no token needed
         # Requires id-token: write permission and trusted publisher configured on npm
-        run: npm publish --access public --provenance
+        run: |
+          npm config set registry https://registry.npmjs.org/
+          npm publish --access public --provenance --verbose
 
       - name: Post-publish verification
         if: github.event.inputs.dry_run != 'true' && steps.check_version.outputs.already_published != 'true'
