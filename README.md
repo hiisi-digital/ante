@@ -38,11 +38,11 @@ npm install -g ante-cli
 yarn global add ante-cli
 pnpm add -g ante-cli
 
-# Deno
-deno install -gAf jsr:@hiisi/ante/cli
+# Deno (the CLI ships in the npm package; jsr:@hiisi/ante is the library)
+deno install -gAf npm:ante-cli
 
 # Or run directly without installing
-deno run -A jsr:@hiisi/ante/cli <command>
+deno run -A npm:ante-cli <command>
 npx ante-cli <command>
 ```
 
@@ -91,8 +91,8 @@ Add to your project scripts:
 // deno.json
 {
   "tasks": {
-    "copyright:check": "deno run -A jsr:@hiisi/ante/cli check",
-    "copyright:fix": "deno run -A jsr:@hiisi/ante/cli fix"
+    "copyright:check": "deno run -A npm:ante-cli check",
+    "copyright:fix": "deno run -A npm:ante-cli fix"
   }
 }
 
@@ -133,7 +133,7 @@ used to derive `spdxLicense` and `licenseUrl` automatically.
 | :--------------------- | :----------------------- | :------------------------------------ |
 | `width`                | `100`                    | Total line width for headers          |
 | `separatorChar`        | `"-"`                    | Character used for separator lines    |
-| `commentPrefix`        | `"//"`                   | Comment prefix (language-aware later) |
+| `commentPrefix`        | `"//"`                   | Comment prefix for header lines       |
 | `nameColumn`           | `40`                     | Column position where name starts     |
 | `emailColumn`          | `65`                     | Column position where email starts    |
 | `licenseUrlColumn`     | `40`                     | Column for license URL in SPDX line   |
@@ -145,7 +145,7 @@ used to derive `spdxLicense` and `licenseUrl` automatically.
 | `contributorSelection` | `"commits"`              | How to pick contributors              |
 | `manualContributors`   | `[]`                     | Explicit contributor list             |
 | `include`              | `["**/*.ts", ...]`       | Files to process                      |
-| `exclude`              | `["**/node_modules/**"]` | Files to skip                         |
+| `exclude`              | `["**/node_modules/**", ...]` | Files to skip                    |
 
 ### Contributor Selection Strategies
 
@@ -193,7 +193,9 @@ The `init` command installs a pre-commit hook that:
 ante init
 ```
 
-This writes hook scripts to `.githooks/` and configures git to use them.
+This writes hook scripts to `.githooks/` and configures git to use them. `init`
+also installs a commit-msg hook that rejects commit messages not in Conventional
+Commits format (`type: subject`).
 
 ## Year Handling
 
