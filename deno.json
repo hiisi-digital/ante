@@ -92,8 +92,6 @@
       "cli/commands/check.ts",
       "cli/commands/fix.ts",
       "cli/commands/add.ts",
-      "hooks/pre-commit",
-      "hooks/functions.sh",
       "schema/config.schema.json",
       "README.md",
       "LICENSE"
