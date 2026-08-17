@@ -14,6 +14,9 @@ This document shows the compatibility status of `@hiisi/ante` across different J
 | **Types** | TypeScript type definitions work correctly |
 | **Test Suite** | Full unit test suite passes |
 
+## Deno
+
+| Version | Actual | Smoke | Types | Test Suite |
 |---------|--------|:-----:|:-----:|:----------:|
 | v1.x | 1.46.3 | ❌ | ❌ | ❌ |
 | v2.x | 2.6.0 | ✅ | ✅ | ✅ |
