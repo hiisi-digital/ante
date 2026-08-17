@@ -12,7 +12,8 @@
     "@std/testing": "jsr:@std/testing@^1.0.0",
     "#core": "./core/mod.ts",
     "#git": "./git/mod.ts",
-    "#cli": "./cli/mod.ts"
+    "#cli": "./cli/mod.ts",
+    "@std/toml": "jsr:@std/toml@^1.0.0"
   },
   "lint": {
     "include": [
