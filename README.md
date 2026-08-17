@@ -28,7 +28,7 @@ formatting. Works as a CLI tool or a library.
 
 The header format is configurable. Column positions, line width, separator
 characters, and contributor selection strategy are all controlled through your
-`deno.json` (or `package.json`).
+`deno.json`, `package.json`, or a standalone `ante.toml`.
 
 ## Installation
 
@@ -124,28 +124,52 @@ Add an `ante` section to your `deno.json` or `package.json`:
 }
 ```
 
+### ante.toml, for projects with no JSON manifest
+
+A Rust crate, a Bash library or a C project has no `deno.json` or
+`package.json` to hold an `ante` section. Those write an `ante.toml` instead,
+where the whole file is the configuration:
+
+```toml
+width = 100
+maintainerEmail = "contact@example.com"
+maxContributors = 3
+contributorSelection = "commits"
+include = ["src/**/*.rs"]
+exclude = ["target/**"]
+```
+
+Same keys, same schema, same defaults. An `[ante]` table is also accepted, so
+one file can move between the standalone and embedded shapes unchanged.
+
+`ante.toml` is searched for ahead of the JSON manifests, because a project only
+writes one when it means to configure ante there. It carries no `license` of its
+own, so the SPDX identifier is read from whichever manifest sits beside it:
+`[package] license` in a `Cargo.toml`, or the top-level `license` in a JSON
+manifest. Setting `spdxLicense` in the toml overrides that.
+
 Most values have sensible defaults. The `license` field from your config file is
 used to derive `spdxLicense` and `licenseUrl` automatically.
 
 ### Configuration Options
 
-| Option                 | Default                  | Description                           |
-| :--------------------- | :----------------------- | :------------------------------------ |
-| `width`                | `100`                    | Total line width for headers          |
-| `separatorChar`        | `"-"`                    | Character used for separator lines    |
-| `commentPrefix`        | `"//"`                   | Comment prefix for header lines       |
-| `nameColumn`           | `40`                     | Column position where name starts     |
-| `emailColumn`          | `65`                     | Column position where email starts    |
-| `licenseUrlColumn`     | `40`                     | Column for license URL in SPDX line   |
-| `maintainerColumn`     | `75`                     | Column for maintainer in SPDX line    |
-| `spdxLicense`          | from `license`           | SPDX license identifier               |
-| `licenseUrl`           | derived                  | URL for the license                   |
-| `maintainerEmail`      | from git                 | Maintainer contact email              |
-| `maxContributors`      | `3`                      | Max contributors shown in header      |
-| `contributorSelection` | `"commits"`              | How to pick contributors              |
-| `manualContributors`   | `[]`                     | Explicit contributor list             |
-| `include`              | `["**/*.ts", ...]`       | Files to process                      |
-| `exclude`              | `["**/node_modules/**", ...]` | Files to skip                    |
+| Option                 | Default                       | Description                         |
+| :--------------------- | :---------------------------- | :---------------------------------- |
+| `width`                | `100`                         | Total line width for headers        |
+| `separatorChar`        | `"-"`                         | Character used for separator lines  |
+| `commentPrefix`        | `"//"`                        | Comment prefix for header lines     |
+| `nameColumn`           | `40`                          | Column position where name starts   |
+| `emailColumn`          | `65`                          | Column position where email starts  |
+| `licenseUrlColumn`     | `40`                          | Column for license URL in SPDX line |
+| `maintainerColumn`     | `75`                          | Column for maintainer in SPDX line  |
+| `spdxLicense`          | from `license`                | SPDX license identifier             |
+| `licenseUrl`           | derived                       | URL for the license                 |
+| `maintainerEmail`      | from git                      | Maintainer contact email            |
+| `maxContributors`      | `3`                           | Max contributors shown in header    |
+| `contributorSelection` | `"commits"`                   | How to pick contributors            |
+| `manualContributors`   | `[]`                          | Explicit contributor list           |
+| `include`              | `["**/*.ts", ...]`            | Files to process                    |
+| `exclude`              | `["**/node_modules/**", ...]` | Files to skip                       |
 
 ### Contributor Selection Strategies
 
@@ -221,11 +245,11 @@ This project is licensed under the terms of the **Mozilla Public License 2.0**.
 
 ## Runtime Compatibility
 
-| Runtime | Versions Tested | Smoke | Types | Tests |
-|---------|-----------------|:-----:|:-----:|:-----:|
-| **Deno** | 1.x, 2.x | ⚠️ | ⚠️ | ⚠️ |
-| **Node.js** | 18, 20, 22 | ✅ | ❌ | ❌ |
-| **Bun** | 1.0, 1.1, latest | ✅ | ❌ | ❌ |
+| Runtime     | Versions Tested  | Smoke | Types | Tests |
+| ----------- | ---------------- | :---: | :---: | :---: |
+| **Deno**    | 1.x, 2.x         |  ⚠️   |  ⚠️   |  ⚠️   |
+| **Node.js** | 18, 20, 22       |  ✅   |  ❌   |  ❌   |
+| **Bun**     | 1.0, 1.1, latest |  ✅   |  ❌   |  ❌   |
 
 - **Smoke**: Basic import and function verification
 - **Types**: TypeScript definitions work correctly
