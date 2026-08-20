@@ -1,6 +1,7 @@
 {
   "name": "@hiisi/ante",
   "version": "0.1.7",
+  "description": "Manage copyright headers in your source files. Check, fix, and keep them consistent.",
   "license": "MPL-2.0",
   "exports": "./mod.ts",
   "imports": {
@@ -11,7 +12,8 @@
     "@std/testing": "jsr:@std/testing@^1.0.0",
     "#core": "./core/mod.ts",
     "#git": "./git/mod.ts",
-    "#cli": "./cli/mod.ts"
+    "#cli": "./cli/mod.ts",
+    "@std/toml": "jsr:@std/toml@^1.0.0"
   },
   "lint": {
     "include": [
@@ -91,8 +93,6 @@
       "cli/commands/check.ts",
       "cli/commands/fix.ts",
       "cli/commands/add.ts",
-      "hooks/pre-commit",
-      "hooks/functions.sh",
       "schema/config.schema.json",
       "README.md",
       "LICENSE"
