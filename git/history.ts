@@ -11,6 +11,7 @@
  */
 
 import { getContributorsFromHistory, getCurrentGitUser, getFileYearRange } from "#core";
+import { run } from "../core/run.ts";
 
 export { getContributorsFromHistory, getCurrentGitUser, getFileYearRange };
 
@@ -22,18 +23,19 @@ export { getContributorsFromHistory, getCurrentGitUser, getFileYearRange };
  */
 export async function getStagedFiles(filter = "ACM"): Promise<string[]> {
   try {
-    const cmd = new Deno.Command("git", {
-      args: ["diff", "--cached", "--name-only", `--diff-filter=${filter}`],
-      stdout: "piped",
-      stderr: "null",
-    });
+    const cmdResult = await run("git", [
+      "diff",
+      "--cached",
+      "--name-only",
+      `--diff-filter=${filter}`,
+    ]);
 
-    const output = await cmd.output();
+    const output = cmdResult;
     if (!output.success) {
       return [];
     }
 
-    const text = new TextDecoder().decode(output.stdout).trim();
+    const text = output.stdout.trim();
     if (!text) {
       return [];
     }
@@ -52,13 +54,9 @@ export async function getStagedFiles(filter = "ACM"): Promise<string[]> {
  */
 export async function isTrackedByGit(file: string): Promise<boolean> {
   try {
-    const cmd = new Deno.Command("git", {
-      args: ["ls-files", "--error-unmatch", file],
-      stdout: "null",
-      stderr: "null",
-    });
+    const cmdResult = await run("git", ["ls-files", "--error-unmatch", file]);
 
-    const output = await cmd.output();
+    const output = cmdResult;
     return output.success;
   } catch {
     return false;
@@ -73,13 +71,9 @@ export async function isTrackedByGit(file: string): Promise<boolean> {
  */
 export async function stageFile(file: string): Promise<boolean> {
   try {
-    const cmd = new Deno.Command("git", {
-      args: ["add", file],
-      stdout: "null",
-      stderr: "null",
-    });
+    const cmdResult = await run("git", ["add", file]);
 
-    const output = await cmd.output();
+    const output = cmdResult;
     return output.success;
   } catch {
     return false;

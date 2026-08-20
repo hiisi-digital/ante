@@ -28,6 +28,7 @@ export { DEFAULT_CONFIG } from "./config.generated.ts";
 import type { AnteConfig, ResolvedConfig } from "./config.generated.ts";
 import { DEFAULT_CONFIG } from "./config.generated.ts";
 import { parse as parseToml } from "@std/toml";
+import { run } from "./run.ts";
 
 /**
  * Well-known SPDX license identifiers mapped to their canonical URLs.
@@ -74,14 +75,10 @@ export function deriveLicenseUrl(spdx: string): string {
  */
 export async function getGitConfig(key: string): Promise<string> {
   try {
-    const cmd = new Deno.Command("git", {
-      args: ["config", "--get", key],
-      stdout: "piped",
-      stderr: "null",
-    });
-    const output = await cmd.output();
+    const cmdResult = await run("git", ["config", "--get", key]);
+    const output = cmdResult;
     if (output.success) {
-      return new TextDecoder().decode(output.stdout).trim();
+      return output.stdout.trim();
     }
   } catch {
     // Git not available or config not set
