@@ -255,4 +255,5 @@ This project is licensed under the terms of the **Mozilla Public License 2.0**.
 - **Types**: TypeScript definitions work correctly
 - **Tests**: Full unit test suite passes
 
-> See [COMPATIBILITY.md](./COMPATIBILITY.md) for detailed version-by-version results.
+> See [COMPATIBILITY.md](./COMPATIBILITY.md) for version-by-version results, which are a
+> snapshot from 2025-12-12 rather than a live matrix.
