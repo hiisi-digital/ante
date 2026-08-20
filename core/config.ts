@@ -7,6 +7,7 @@
  * Configuration module for ante.
  *
  * Handles loading, resolving, and deriving configuration from:
+ * - ante.toml, a standalone file for projects with no JSON manifest
  * - deno.json / package.json "ante" section
  * - Git config (user.name, user.email)
  * - Sensible defaults
@@ -26,6 +27,7 @@ export { DEFAULT_CONFIG } from "./config.generated.ts";
 
 import type { AnteConfig, ResolvedConfig } from "./config.generated.ts";
 import { DEFAULT_CONFIG } from "./config.generated.ts";
+import { parse as parseToml } from "@std/toml";
 
 /**
  * Well-known SPDX license identifiers mapped to their canonical URLs.
@@ -170,14 +172,75 @@ async function readJsonFile(path: string): Promise<Record<string, unknown>> {
   return JSON.parse(content);
 }
 
+async function readTomlFile(path: string): Promise<Record<string, unknown>> {
+  const content = await Deno.readTextFile(path);
+  return parseToml(content) as Record<string, unknown>;
+}
+
+/**
+ * Pull the ante section out of a parsed config file.
+ *
+ * In a shared manifest (deno.json, package.json) the config lives under an
+ * `ante` key, because the rest of the file belongs to someone else. In a
+ * standalone `ante.toml` the whole file is ante's, so the top level is the
+ * config. An `[ante]` table is still honoured there, so a single file can be
+ * moved between the two shapes without being rewritten.
+ */
+function extractAnteSection(
+  json: Record<string, unknown>,
+  standalone: boolean,
+): Partial<AnteConfig> {
+  if (json.ante && typeof json.ante === "object") {
+    return json.ante as Partial<AnteConfig>;
+  }
+  return standalone ? (json as Partial<AnteConfig>) : {};
+}
+
+/**
+ * Find the project licence for a standalone config.
+ *
+ * `ante.toml` carries no licence of its own, so the SPDX identifier is read
+ * from whichever manifest sits beside it. Cargo puts it under `[package]`;
+ * the JSON manifests put it at the top level.
+ */
+async function findSiblingLicense(dir: string): Promise<string | undefined> {
+  // Read a manifest's licence, or undefined if it is absent or unreadable.
+  const licenseOf = async (name: string): Promise<string | undefined> => {
+    const path = `${dir}/${name}`;
+    if (!(await fileExists(path))) return undefined;
+    try {
+      if (name === "Cargo.toml") {
+        const toml = await readTomlFile(path);
+        const pkg = toml.package as Record<string, unknown> | undefined;
+        return typeof pkg?.license === "string" ? pkg.license : undefined;
+      }
+      const json = await readJsonFile(path);
+      return typeof json.license === "string" ? json.license : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+
+  // Checked in parallel, but resolved in order, so Cargo.toml still wins.
+  const names = ["Cargo.toml", "deno.json", "deno.jsonc", "package.json"];
+  const found = await Promise.all(names.map(licenseOf));
+  return found.find((license) => license !== undefined);
+}
+
 /**
  * Loads configuration from a deno.json or package.json file.
  *
  * Search order:
  * 1. Explicit path if provided
- * 2. deno.json in current directory or parents
- * 3. deno.jsonc in current directory or parents
- * 4. package.json in current directory or parents
+ * 2. ante.toml in current directory or parents
+ * 3. deno.json in current directory or parents
+ * 4. deno.jsonc in current directory or parents
+ * 5. package.json in current directory or parents
+ *
+ * `ante.toml` comes first because it is unambiguous: a project only writes one
+ * when it means to configure ante there. It also lets Rust, Bash and any other
+ * project with no JSON manifest configure ante at all, which was previously
+ * impossible.
  *
  * @param path - Optional explicit path to config file
  * @returns The loaded configuration merged with defaults
@@ -187,24 +250,34 @@ export async function loadConfig(path?: string): Promise<ResolvedConfig> {
 
   if (!configPath) {
     const cwd = Deno.cwd();
-    configPath = await findConfigFile(cwd, ["deno.json", "deno.jsonc", "package.json"]);
+    configPath = await findConfigFile(cwd, [
+      "ante.toml",
+      "deno.json",
+      "deno.jsonc",
+      "package.json",
+    ]);
   }
 
   let partial: Partial<AnteConfig> = {};
   let projectLicense: string | undefined;
 
   if (configPath) {
+    const isToml = configPath.endsWith(".toml");
     try {
-      const json = await readJsonFile(configPath);
+      const parsed = isToml ? await readTomlFile(configPath) : await readJsonFile(configPath);
 
-      // Look for ante config section
-      if (json.ante && typeof json.ante === "object") {
-        partial = json.ante as Partial<AnteConfig>;
-      }
+      partial = extractAnteSection(parsed, isToml);
 
       // Look for project license
-      if (json.license && typeof json.license === "string") {
-        projectLicense = json.license;
+      if (typeof parsed.license === "string") {
+        projectLicense = parsed.license;
+      }
+
+      // A standalone ante.toml carries no licence of its own, so read it from
+      // whichever manifest sits beside it.
+      if (!projectLicense && isToml) {
+        const dir = configPath.slice(0, configPath.lastIndexOf("/")) || ".";
+        projectLicense = await findSiblingLicense(dir);
       }
     } catch {
       // Failed to read config, use defaults
