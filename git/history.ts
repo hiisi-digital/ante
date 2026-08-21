@@ -23,14 +23,12 @@ export { getContributorsFromHistory, getCurrentGitUser, getFileYearRange };
  */
 export async function getStagedFiles(filter = "ACM"): Promise<string[]> {
   try {
-    const cmdResult = await run("git", [
+    const output = await run("git", [
       "diff",
       "--cached",
       "--name-only",
       `--diff-filter=${filter}`,
     ]);
-
-    const output = cmdResult;
     if (!output.success) {
       return [];
     }
@@ -54,9 +52,7 @@ export async function getStagedFiles(filter = "ACM"): Promise<string[]> {
  */
 export async function isTrackedByGit(file: string): Promise<boolean> {
   try {
-    const cmdResult = await run("git", ["ls-files", "--error-unmatch", file]);
-
-    const output = cmdResult;
+    const output = await run("git", ["ls-files", "--error-unmatch", file]);
     return output.success;
   } catch {
     return false;
@@ -71,9 +67,7 @@ export async function isTrackedByGit(file: string): Promise<boolean> {
  */
 export async function stageFile(file: string): Promise<boolean> {
   try {
-    const cmdResult = await run("git", ["add", file]);
-
-    const output = cmdResult;
+    const output = await run("git", ["add", file]);
     return output.success;
   } catch {
     return false;

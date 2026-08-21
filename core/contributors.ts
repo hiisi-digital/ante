@@ -91,7 +91,7 @@ function sortByStrategy(
 async function getContributorStats(file: string): Promise<ContributorStats[]> {
   try {
     // Get git log with author info, commit count per author
-    const cmdResult = await run("git", [
+    const output = await run("git", [
       "log",
       "--follow",
       "--format=%aN|%aE|%aI",
@@ -99,8 +99,6 @@ async function getContributorStats(file: string): Promise<ContributorStats[]> {
       "--",
       file,
     ]);
-
-    const output = cmdResult;
     if (!output.success) {
       return [];
     }

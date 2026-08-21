@@ -75,8 +75,7 @@ export function deriveLicenseUrl(spdx: string): string {
  */
 export async function getGitConfig(key: string): Promise<string> {
   try {
-    const cmdResult = await run("git", ["config", "--get", key]);
-    const output = cmdResult;
+    const output = await run("git", ["config", "--get", key]);
     if (output.success) {
       return output.stdout.trim();
     }

@@ -61,10 +61,13 @@ try {
     shims: {
       deno: true,
     },
-    // The shim'''s type declarations do not carry `Deno.Command`, though its runtime does,
-    // which is checked in tests/node/command.mjs. Type-checking the built output therefore
-    // fails on the four places that spawn git, for a property that is present when it runs.
-    typeCheck: false,
+    // The built output is type-checked. It was not, on the reasoning that the shim's
+    // declarations lack `Deno.Command` while its runtime has it. Neither half held: the
+    // runtime does not have it either, and the file cited as checking so did not exist.
+    // Nothing reaches for `Deno.Command` any more, because `core/run.ts` picks whichever
+    // spawn its runtime actually offers, so the check that was turned off to hide the
+    // problem goes back on now the problem is gone.
+    typeCheck: "both",
     scriptModule: false, // ESM only - CLI uses top-level await
     test: false,
     skipSourceOutput: true,

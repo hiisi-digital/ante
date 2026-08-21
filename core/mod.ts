@@ -19,4 +19,5 @@ export * from "./contributors.ts";
 export * from "./formatter.ts";
 export * from "./glob.ts";
 export * from "./header.ts";
+export * from "./run.ts";
 export { VERSION } from "./version.ts";
