@@ -7,21 +7,23 @@
 /**
  * Package version.
  *
- * This module exports the current version of the ante package.
- * The version is read from deno.json to ensure consistency.
+ * A constant rather than a read of `deno.json`, because the config sits beside
+ * this module in a clone and nowhere else. Installed from jsr the module lives
+ * behind an `https:` URL; built into an npm or bun distribution the config is
+ * not shipped at all. This was a static import, so the failure was not a wrong
+ * version but a package that could not be loaded.
+ *
+ * The duplication is real and is pinned by `tests/version_test.ts`, so the two
+ * cannot drift apart without the suite saying so.
  */
-
-// Import version from deno.json
-// Note: This works in Deno but requires --allow-read for the config file
-import config from "../deno.json" with { type: "json" };
 
 /**
  * The current version of the ante package.
  *
  * @example
  * ```ts
- * import { VERSION } from "@loru/ante";
+ * import { VERSION } from "@hiisi/ante";
  * console.log(`ante v${VERSION}`);
  * ```
  */
-export const VERSION: string = config.version;
+export const VERSION: string = "0.2.0";
