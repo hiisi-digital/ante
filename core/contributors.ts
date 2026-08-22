@@ -12,6 +12,7 @@
 
 import type { AnteConfig, Contributor, ContributorSelection } from "./config.ts";
 import { getGitConfig } from "./config.ts";
+import { run } from "./run.ts";
 
 export type { Contributor };
 
@@ -90,25 +91,19 @@ function sortByStrategy(
 async function getContributorStats(file: string): Promise<ContributorStats[]> {
   try {
     // Get git log with author info, commit count per author
-    const cmd = new Deno.Command("git", {
-      args: [
-        "log",
-        "--follow",
-        "--format=%aN|%aE|%aI",
-        "--numstat",
-        "--",
-        file,
-      ],
-      stdout: "piped",
-      stderr: "null",
-    });
-
-    const output = await cmd.output();
+    const output = await run("git", [
+      "log",
+      "--follow",
+      "--format=%aN|%aE|%aI",
+      "--numstat",
+      "--",
+      file,
+    ]);
     if (!output.success) {
       return [];
     }
 
-    const text = new TextDecoder().decode(output.stdout);
+    const text = output.stdout;
     return parseGitLog(text);
   } catch {
     return [];
@@ -261,27 +256,26 @@ export async function getFileYearRange(
 ): Promise<{ firstYear: number; lastYear: number } | null> {
   try {
     // Get first commit date
-    const firstCmd = new Deno.Command("git", {
-      args: ["log", "--follow", "--format=%aI", "--reverse", "--", file],
-      stdout: "piped",
-      stderr: "null",
-    });
-    const firstOutput = await firstCmd.output();
+    const firstCmdResult = await run("git", [
+      "log",
+      "--follow",
+      "--format=%aI",
+      "--reverse",
+      "--",
+      file,
+    ]);
+    const firstOutput = firstCmdResult;
 
     // Get last commit date
-    const lastCmd = new Deno.Command("git", {
-      args: ["log", "-1", "--format=%aI", "--", file],
-      stdout: "piped",
-      stderr: "null",
-    });
-    const lastOutput = await lastCmd.output();
+    const lastCmdResult = await run("git", ["log", "-1", "--format=%aI", "--", file]);
+    const lastOutput = lastCmdResult;
 
     if (!firstOutput.success || !lastOutput.success) {
       return null;
     }
 
-    const firstText = new TextDecoder().decode(firstOutput.stdout).trim();
-    const lastText = new TextDecoder().decode(lastOutput.stdout).trim();
+    const firstText = firstOutput.stdout.trim();
+    const lastText = lastOutput.stdout.trim();
 
     const firstLine = firstText.split("\n")[0];
     const lastLine = lastText.split("\n")[0];

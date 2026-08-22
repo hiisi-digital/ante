@@ -9,9 +9,15 @@
  * This test imports from the built npm package (./npm/esm/mod.js) and verifies
  * that the core functionality works correctly in these runtimes.
  *
- * Run with:
- *   node tests/node/smoke.test.mjs
- *   bun run tests/node/smoke.test.mjs
+ * Needs the npm build first, since that is what it imports:
+ *   deno task test:node
+ *
+ * Or by hand, after `deno task build:npm`:
+ *   node tests/node/smoke.mjs
+ *   bun run tests/node/smoke.mjs
+ *
+ * Not named `*.test.mjs`, because `deno test` would collect it, type-check an import of
+ * a build artefact a fresh clone does not have, and then be ended by its `process.exit`.
  */
 
 import { hasValidHeader } from "../../npm/esm/mod.js";
