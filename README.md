@@ -247,9 +247,9 @@ This project is licensed under the terms of the **Mozilla Public License 2.0**.
 
 | Runtime     | Versions Tested  | Smoke | Types | Tests |
 | ----------- | ---------------- | :---: | :---: | :---: |
-| **Deno**    | 1.x, 2.x         |  ⚠️   |  ⚠️   |  ⚠️   |
-| **Node.js** | 18, 20, 22       |  ✅   |  ❌   |  ❌   |
-| **Bun**     | 1.0, 1.1, latest |  ✅   |  ❌   |  ❌   |
+| **Deno**    | 1.x, 2.x         |  partial   |  partial   |  partial   |
+| **Node.js** | 18, 20, 22       |  yes   |  no   |  no   |
+| **Bun**     | 1.0, 1.1, latest |  yes   |  no   |  no   |
 
 - **Smoke**: Basic import and function verification
 - **Types**: TypeScript definitions work correctly

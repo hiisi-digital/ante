@@ -11,6 +11,7 @@
  */
 
 import type { ResolvedConfig } from "#core";
+import { run } from "../core/run.ts";
 
 /**
  * Default hooks directory name.
@@ -309,14 +310,9 @@ export async function installHook(
   await Deno.chmod(commitMsgPath, 0o755);
 
   // Configure git to use the hooks directory
-  const cmd = new Deno.Command("git", {
-    args: ["config", "core.hooksPath", HOOKS_DIR],
-    cwd: targetDir,
-    stdout: "null",
-    stderr: "null",
-  });
-
-  await cmd.output();
+  // The result is not read: git either sets the path or it does not, and there is
+  // nothing useful to do about the second case here.
+  await run("git", ["config", "core.hooksPath", HOOKS_DIR]);
 }
 
 /**
@@ -336,14 +332,8 @@ export async function uninstallHook(targetDir: string): Promise<void> {
   }
 
   // Reset git hooks path
-  const cmd = new Deno.Command("git", {
-    args: ["config", "--unset", "core.hooksPath"],
-    cwd: targetDir,
-    stdout: "null",
-    stderr: "null",
-  });
-
-  await cmd.output();
+  // Unsetting something that is not set is not an error worth reporting.
+  await run("git", ["config", "--unset", "core.hooksPath"]);
 }
 
 /**
