@@ -1,5 +1,5 @@
 //----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+// Copyright (c) 2025-2026                    orgrinrt                    orgrinrt@ikiuni.dev
 //                                      orgrinrt                 ort@hiisi.digital
 // SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
 //----------------------------------------------------------------------------------------------------
@@ -12,12 +12,13 @@
  */
 
 import type { ResolvedConfig } from "#core";
-import { hasValidHeader, matchesGlob, validateHeader } from "#core";
+import { hasValidHeader, validateHeader } from "#core";
+import { findFilesRecursive } from "./_files.ts";
 
 /**
  * Options for the check command.
  */
-export interface CheckOptions {
+interface CheckOptions {
   /** Glob pattern to filter files (overrides config.include) */
   glob?: string;
   /** Show verbose output */
@@ -29,7 +30,7 @@ export interface CheckOptions {
 /**
  * Result of checking a single file.
  */
-export interface FileCheckResult {
+interface FileCheckResult {
   /** Path to the file */
   path: string;
   /** Whether the file passed validation */
@@ -41,7 +42,7 @@ export interface FileCheckResult {
 /**
  * Result of the check command.
  */
-export interface CheckResult {
+interface CheckResult {
   /** Total files checked */
   totalFiles: number;
   /** Files that passed */
@@ -50,56 +51,6 @@ export interface CheckResult {
   failedFiles: number;
   /** Per-file results */
   files: FileCheckResult[];
-}
-
-/**
- * Checks if a path matches any of the given patterns.
- */
-function matchesAnyPattern(path: string, patterns: string[]): boolean {
-  return patterns.some((pattern) => matchesGlob(path, pattern));
-}
-
-/**
- * Recursively finds files matching patterns.
- */
-async function findFilesRecursive(
-  dir: string,
-  includePatterns: string[],
-  excludePatterns: string[],
-): Promise<string[]> {
-  const files: string[] = [];
-
-  try {
-    for await (const entry of Deno.readDir(dir)) {
-      const path = dir === "." ? entry.name : `${dir}/${entry.name}`;
-
-      // Check if path is excluded
-      if (matchesAnyPattern(path, excludePatterns)) {
-        continue;
-      }
-
-      if (entry.isDirectory) {
-        // Skip hidden directories
-        if (entry.name.startsWith(".")) {
-          continue;
-        }
-        const subFiles = await findFilesRecursive(
-          path,
-          includePatterns,
-          excludePatterns,
-        );
-        files.push(...subFiles);
-      } else if (entry.isFile) {
-        if (matchesAnyPattern(path, includePatterns)) {
-          files.push(path);
-        }
-      }
-    }
-  } catch {
-    // Directory read failed - skip silently
-  }
-
-  return files;
 }
 
 /**
@@ -208,25 +159,4 @@ export async function runCheck(
   }
 
   return summary;
-}
-
-/**
- * Entry point when run as CLI command.
- */
-export async function main(args: string[]): Promise<void> {
-  const glob = args[0];
-
-  // Load config and run check
-  const { loadConfig } = await import("#core");
-  const config = await loadConfig();
-
-  const result = await runCheck(config, {
-    glob,
-    verbose: args.includes("--verbose") || args.includes("-v"),
-    format: args.includes("--json") ? "json" : "human",
-  });
-
-  if (result.failedFiles > 0) {
-    Deno.exit(1);
-  }
 }

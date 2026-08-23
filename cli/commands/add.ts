@@ -24,7 +24,7 @@ import {
 /**
  * Options for the add command.
  */
-export interface AddOptions {
+interface AddOptions {
   /** Path to the file to add a header to */
   file: string;
   /** Force overwrite existing header */

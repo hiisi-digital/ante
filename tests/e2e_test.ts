@@ -19,6 +19,7 @@ import { assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
 import { main as cliMain } from "../cli/mod.ts";
+import { createTempDir, readFile, removeDir, writeFile } from "./_utils/fs.ts";
 
 /**
  * Test environment representing a simulated project.
@@ -28,42 +29,6 @@ interface TestEnvironment {
   rootDir: string;
   /** Original working directory to restore after tests */
   originalCwd: string;
-}
-
-/**
- * Creates a temporary directory for the test environment.
- */
-async function createTempDir(prefix: string): Promise<string> {
-  return await Deno.makeTempDir({ prefix });
-}
-
-/**
- * Removes a directory recursively.
- */
-async function removeDir(path: string): Promise<void> {
-  try {
-    await Deno.remove(path, { recursive: true });
-  } catch {
-    // Ignore errors during cleanup
-  }
-}
-
-/**
- * Writes a file, creating parent directories as needed.
- */
-async function writeFile(path: string, content: string): Promise<void> {
-  const dir = path.substring(0, path.lastIndexOf("/"));
-  if (dir) {
-    await Deno.mkdir(dir, { recursive: true });
-  }
-  await Deno.writeTextFile(path, content);
-}
-
-/**
- * Reads a file and returns its content.
- */
-async function readFile(path: string): Promise<string> {
-  return await Deno.readTextFile(path);
 }
 
 /**

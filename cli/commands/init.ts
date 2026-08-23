@@ -1,5 +1,6 @@
 //----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+// Copyright (c) 2025-2026                    orgrinrt                    orgrinrt@ikiuni.dev
+//                                      orgrinrt                 ort@hiisi.digital
 // SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
 //----------------------------------------------------------------------------------------------------
 
@@ -12,11 +13,12 @@
 import type { AnteConfig } from "#core";
 import { deriveLicenseUrl, loadConfig } from "#core";
 import { installHook } from "#git";
+import { readJsonFile } from "#core";
 
 /**
  * Options for the init command.
  */
-export interface InitOptions {
+interface InitOptions {
   /** Skip interactive prompts and use defaults */
   yes?: boolean;
   /** Skip git hook installation */
@@ -28,7 +30,7 @@ export interface InitOptions {
 /**
  * Result of the init command.
  */
-export interface InitResult {
+interface InitResult {
   /** Whether config was created or updated */
   configUpdated: boolean;
   /** Whether hooks were installed */
@@ -59,18 +61,6 @@ async function findOrCreateConfigPath(dir: string): Promise<string> {
   // Return the first existing file, or default to deno.json
   const found = results.find((r) => r !== null);
   return found ?? `${dir}/deno.json`;
-}
-
-/**
- * Reads a JSON file.
- */
-async function readJsonFile(path: string): Promise<Record<string, unknown>> {
-  try {
-    const content = await Deno.readTextFile(path);
-    return JSON.parse(content);
-  } catch {
-    return {};
-  }
 }
 
 /**
@@ -175,14 +165,4 @@ export async function runInit(options: InitOptions = {}): Promise<InitResult> {
     hooksInstalled,
     configPath,
   };
-}
-
-/**
- * Prompts the user for configuration values interactively.
- * Currently a stub - returns defaults.
- */
-export async function promptForConfig(): Promise<Partial<AnteConfig>> {
-  // For now, return defaults. Interactive prompts can be added later.
-  await Promise.resolve();
-  return createDefaultAnteConfig();
 }

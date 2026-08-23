@@ -1,6 +1,6 @@
 {
   "name": "@hiisi/ante",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Manage copyright headers in your source files. Check, fix, and keep them consistent.",
   "license": "MPL-2.0",
   "exports": "./mod.ts",
@@ -13,7 +13,10 @@
     "#core": "./core/mod.ts",
     "#git": "./git/mod.ts",
     "#cli": "./cli/mod.ts",
-    "@std/toml": "jsr:@std/toml@^1.0.0"
+    "@std/toml": "jsr:@std/toml@^1.0.0",
+    "@hiisi/viola": "jsr:@hiisi/viola@^0.4.0",
+    "@hiisi/viola-default-lints": "jsr:@hiisi/viola-default-lints@^0.4.0",
+    "@hiisi/viola-grammar-ts": "jsr:@hiisi/viola-grammar-ts@^0.4.0"
   },
   "lint": {
     "include": [
@@ -64,7 +67,7 @@
     "test": "deno test --allow-read --allow-write --allow-env --allow-run",
     "test:watch": "deno test --allow-read --allow-write --allow-env --allow-run --watch",
     "test:coverage": "deno test --allow-read --allow-write --allow-env --allow-run --coverage=coverage/",
-    "lint": "deno run -A --min-dep-age=0 jsr:@hiisi/viola-cli@^0.3.1 --project . --include .",
+    "lint": "deno run -A gate.ts",
     "lint:fix": "deno lint --fix",
     "fmt": "deno fmt",
     "fmt:check": "deno fmt --check",
@@ -112,5 +115,10 @@
     "spdxLicense": "MPL-2.0",
     "licenseUrl": "https://mozilla.org/MPL/2.0"
   },
-  "minimumDependencyAge": 0
+  "minimumDependencyAge": 0,
+  "links": [
+    "../viola",
+    "../viola-default-lints",
+    "../viola-grammar-ts"
+  ]
 }

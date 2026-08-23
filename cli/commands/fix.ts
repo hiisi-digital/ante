@@ -1,5 +1,5 @@
 //----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+// Copyright (c) 2025-2026                    orgrinrt                    orgrinrt@ikiuni.dev
 //                                      orgrinrt                 ort@hiisi.digital
 // SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
 //----------------------------------------------------------------------------------------------------
@@ -17,16 +17,16 @@ import {
   getCurrentGitUser,
   getFileYearRange,
   hasValidHeader,
-  matchesGlob,
   parseHeader,
   replaceHeader,
   updateHeader,
 } from "#core";
+import { findFilesRecursive } from "./_files.ts";
 
 /**
  * Options for the fix command.
  */
-export interface FixOptions {
+interface FixOptions {
   /** Glob pattern to match files (overrides config.include) */
   glob?: string;
   /** Dry run - show what would be fixed without making changes */
@@ -38,7 +38,7 @@ export interface FixOptions {
 /**
  * Result of fixing a single file.
  */
-export interface FixResult {
+interface FixResult {
   /** The file path */
   file: string;
   /** Whether the file was modified */
@@ -47,56 +47,6 @@ export interface FixResult {
   action: "created" | "updated" | "unchanged" | "skipped";
   /** Details about what changed */
   details?: string;
-}
-
-/**
- * Checks if a path matches any of the given patterns.
- */
-function matchesAnyPattern(path: string, patterns: string[]): boolean {
-  return patterns.some((pattern) => matchesGlob(path, pattern));
-}
-
-/**
- * Recursively finds files matching patterns.
- */
-async function findFilesRecursive(
-  dir: string,
-  includePatterns: string[],
-  excludePatterns: string[],
-): Promise<string[]> {
-  const files: string[] = [];
-
-  try {
-    for await (const entry of Deno.readDir(dir)) {
-      const path = dir === "." ? entry.name : `${dir}/${entry.name}`;
-
-      // Check if path is excluded
-      if (matchesAnyPattern(path, excludePatterns)) {
-        continue;
-      }
-
-      if (entry.isDirectory) {
-        // Skip hidden directories
-        if (entry.name.startsWith(".")) {
-          continue;
-        }
-        const subFiles = await findFilesRecursive(
-          path,
-          includePatterns,
-          excludePatterns,
-        );
-        files.push(...subFiles);
-      } else if (entry.isFile) {
-        if (matchesAnyPattern(path, includePatterns)) {
-          files.push(path);
-        }
-      }
-    }
-  } catch {
-    // Directory read failed - skip silently
-  }
-
-  return files;
 }
 
 /**
@@ -272,21 +222,4 @@ export async function runFix(
   }
 
   return results;
-}
-
-/**
- * Entry point for CLI invocation.
- */
-export async function main(args: string[]): Promise<number> {
-  const { loadConfig } = await import("#core");
-  const config = await loadConfig();
-
-  const results = await runFix(config, {
-    glob: args[0],
-    dryRun: args.includes("--dry-run"),
-    verbose: args.includes("--verbose") || args.includes("-v"),
-  });
-
-  const modified = results.filter((r) => r.modified).length;
-  return modified > 0 ? 0 : 0;
 }

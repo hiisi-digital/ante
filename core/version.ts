@@ -1,5 +1,5 @@
 //----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+// Copyright (c) 2025-2026                    orgrinrt                    orgrinrt@ikiuni.dev
 //                                      orgrinrt                 ort@hiisi.digital
 // SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
 //----------------------------------------------------------------------------------------------------
@@ -26,4 +26,4 @@
  * console.log(`ante v${VERSION}`);
  * ```
  */
-export const VERSION: string = "0.2.0";
+export const VERSION: string = "0.2.2";
