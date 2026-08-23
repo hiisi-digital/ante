@@ -1,6 +1,6 @@
 {
   "name": "@hiisi/ante",
-  "version": "0.2.0",
+  "version": "0.2.0-alpha.1",
   "description": "Manage copyright headers in your source files. Check, fix, and keep them consistent.",
   "license": "MPL-2.0",
   "exports": "./mod.ts",
