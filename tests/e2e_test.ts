@@ -1,5 +1,5 @@
 //----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+// Copyright (c) 2025-2026                    orgrinrt                    orgrinrt@ikiuni.dev
 //                                      orgrinrt                 ort@hiisi.digital
 // SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
 //----------------------------------------------------------------------------------------------------
@@ -401,6 +401,23 @@ describe("E2E: ante add", () => {
 
   afterEach(async () => {
     await teardownEnvironment(env);
+  });
+
+  // `fix` had a dry-run test and `add` did not, so `add` accepted --dry-run,
+  // printed that it was adding a header, and wrote the file anyway. The flag
+  // was parsed by the cli and never reached the command.
+  it("should not modify the file in dry-run mode", async () => {
+    const originalContent = `export const answer = 42;\n`;
+    await writeFile(join(env.rootDir, "src/answer.ts"), originalContent);
+    await gitCommit(env.rootDir, "Add answer");
+
+    const { exitCode } = await captureOutput(
+      () => cliMain(["add", "src/answer.ts", "--dry-run"]),
+    );
+
+    assertEquals(exitCode, 0);
+    const afterContent = await readFile(join(env.rootDir, "src/answer.ts"));
+    assertEquals(afterContent, originalContent);
   });
 
   it("should add header to a specific file", async () => {
