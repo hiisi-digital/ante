@@ -4,6 +4,11 @@
 //--------------------------------------------------------------------------------------------------
 
 #!/usr/bin/env -S deno run -A
+//--------------------------------------------------------------------------------------------------
+// Copyright (c) 2026                   orgrinrt                 ort@hiisi.digital
+// SPDX-License-Identifier: MPL-2.0     https://mozilla.org/MPL/2.0        ort@hiisi.digital
+//--------------------------------------------------------------------------------------------------
+
 /**
  * viola, run on this package, by the library rather than through the cli.
  *
