@@ -1,5 +1,6 @@
 //----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+// Copyright (c) 2025-2026                    orgrinrt                    orgrinrt@ikiuni.dev
+//                                      orgrinrt                 ort@hiisi.digital
 // SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
 //----------------------------------------------------------------------------------------------------
 
@@ -28,6 +29,8 @@ export interface AddOptions {
   file: string;
   /** Force overwrite existing header */
   force?: boolean;
+  /** Report what would be written without writing it */
+  dryRun?: boolean;
 }
 
 /**
@@ -38,7 +41,7 @@ export interface AddOptions {
  * @returns Exit code (0 for success, non-zero for failure)
  */
 export async function add(options: AddOptions, config: ResolvedConfig): Promise<number> {
-  const { file, force = false } = options;
+  const { file, force = false, dryRun = false } = options;
 
   // Check if file exists
   try {
@@ -124,6 +127,10 @@ export async function add(options: AddOptions, config: ResolvedConfig): Promise<
   }
 
   // Write the file
+  if (dryRun) {
+    console.log(`Would write header to: ${file}`);
+    return 0;
+  }
   try {
     await Deno.writeTextFile(file, newContent);
     console.log(`Done.`);

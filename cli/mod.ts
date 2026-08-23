@@ -1,5 +1,5 @@
 //----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+// Copyright (c) 2025-2026                    orgrinrt                    orgrinrt@ikiuni.dev
 //                                      orgrinrt                 ort@hiisi.digital
 // SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
 //----------------------------------------------------------------------------------------------------
@@ -228,6 +228,7 @@ export async function main(args: string[]): Promise<number> {
         {
           file: parsed.args[0],
           force: parsed.flags.force,
+          dryRun: parsed.flags.dryRun,
         },
         config,
       );
