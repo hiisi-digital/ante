@@ -13,7 +13,10 @@
     "#core": "./core/mod.ts",
     "#git": "./git/mod.ts",
     "#cli": "./cli/mod.ts",
-    "@std/toml": "jsr:@std/toml@^1.0.0"
+    "@std/toml": "jsr:@std/toml@^1.0.0",
+    "@hiisi/viola": "jsr:@hiisi/viola@^0.3.1",
+    "@hiisi/viola-default-lints": "jsr:@hiisi/viola-default-lints@^0.3.1",
+    "@hiisi/viola-grammar-ts": "jsr:@hiisi/viola-grammar-ts@^0.3.1"
   },
   "lint": {
     "include": [
@@ -64,7 +67,7 @@
     "test": "deno test --allow-read --allow-write --allow-env --allow-run",
     "test:watch": "deno test --allow-read --allow-write --allow-env --allow-run --watch",
     "test:coverage": "deno test --allow-read --allow-write --allow-env --allow-run --coverage=coverage/",
-    "lint": "deno lint",
+    "lint": "deno run -A --min-dep-age=0 jsr:@hiisi/viola-cli@^0.3.1 --project . --include src,mod.ts",
     "lint:fix": "deno lint --fix",
     "fmt": "deno fmt",
     "fmt:check": "deno fmt --check",
@@ -111,5 +114,6 @@
     "contributorSelection": "commits",
     "spdxLicense": "MPL-2.0",
     "licenseUrl": "https://mozilla.org/MPL/2.0"
-  }
+  },
+  "minimumDependencyAge": 0
 }
