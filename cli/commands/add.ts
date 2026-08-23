@@ -1,5 +1,6 @@
 //----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+// Copyright (c) 2025-2026                    orgrinrt                    orgrinrt@ikiuni.dev
+//                                      orgrinrt                 ort@hiisi.digital
 // SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
 //----------------------------------------------------------------------------------------------------
 
@@ -23,7 +24,7 @@ import {
 /**
  * Options for the add command.
  */
-export interface AddOptions {
+interface AddOptions {
   /** Path to the file to add a header to */
   file: string;
   /** Force overwrite existing header */

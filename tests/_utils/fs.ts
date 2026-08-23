@@ -1,5 +1,5 @@
 //----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+// Copyright (c) 2025-2026                    orgrinrt                    orgrinrt@ikiuni.dev
 //                                      orgrinrt                 ort@hiisi.digital
 // SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
 //----------------------------------------------------------------------------------------------------
@@ -108,6 +108,12 @@ export async function createTempDir(prefix = "test_"): Promise<string> {
  */
 export async function writeFile(path: string, content: string): Promise<void> {
   if (isDeno) {
+    // The node branch below has always created the parent directory and this
+    // one did not, so the same call worked under one runtime and threw under
+    // the other. Surfaced by a suite that had its own copy of this helper,
+    // which did create the parent.
+    const parent = path.slice(0, path.lastIndexOf("/"));
+    if (parent) await globalDeno.mkdir(parent, { recursive: true });
     await globalDeno.writeTextFile(path, content);
     return;
   }

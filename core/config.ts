@@ -1,5 +1,6 @@
 //----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+// Copyright (c) 2025-2026                    orgrinrt                    orgrinrt@ikiuni.dev
+//                                      orgrinrt                 ort@hiisi.digital
 // SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
 //----------------------------------------------------------------------------------------------------
 
@@ -163,7 +164,7 @@ async function findConfigFile(
 /**
  * Reads a JSON file and returns its parsed content.
  */
-async function readJsonFile(path: string): Promise<Record<string, unknown>> {
+export async function readJsonFile(path: string): Promise<Record<string, unknown>> {
   const content = await Deno.readTextFile(path);
   return JSON.parse(content);
 }
