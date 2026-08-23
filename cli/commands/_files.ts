@@ -67,4 +67,3 @@ async function findFilesRecursive(
 
   return files;
 }
-

@@ -63,7 +63,6 @@ async function findOrCreateConfigPath(dir: string): Promise<string> {
   return found ?? `${dir}/deno.json`;
 }
 
-
 /**
  * Writes a JSON file with pretty formatting.
  */
@@ -167,4 +166,3 @@ export async function runInit(options: InitOptions = {}): Promise<InitResult> {
     configPath,
   };
 }
-

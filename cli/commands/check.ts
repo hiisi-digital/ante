@@ -53,8 +53,6 @@ interface CheckResult {
   files: FileCheckResult[];
 }
 
-
-
 /**
  * Expands glob patterns to file paths.
  */
@@ -162,4 +160,3 @@ export async function runCheck(
 
   return summary;
 }
-

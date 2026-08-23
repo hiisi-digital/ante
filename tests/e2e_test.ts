@@ -31,10 +31,6 @@ interface TestEnvironment {
   originalCwd: string;
 }
 
-
-
-
-
 /**
  * Runs a shell command and returns the result.
  */

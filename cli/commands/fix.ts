@@ -49,8 +49,6 @@ interface FixResult {
   details?: string;
 }
 
-
-
 /**
  * Fixes a single file's header.
  */
@@ -225,4 +223,3 @@ export async function runFix(
 
   return results;
 }
-
