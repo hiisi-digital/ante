@@ -604,6 +604,29 @@ describe("E2E: Edge Cases", () => {
     assertStringIncludes(content, "SPDX-License-Identifier");
   });
 
+  it("should put the header above a rust inner attribute", async () => {
+    await writeFile(
+      join(env.rootDir, "src/lib.rs"),
+      `#![no_std]\n\npub fn f() {}\n`,
+    );
+    await gitCommit(env.rootDir, "Add a no_std crate root");
+
+    const { exitCode } = await captureOutput(
+      () => cliMain(["fix", "src/lib.rs"]),
+    );
+    assertEquals(exitCode, 0);
+
+    const content = await readFile(join(env.rootDir, "src/lib.rs"));
+    assertEquals(content.split("\n")[0].startsWith("//"), true);
+    assertStringIncludes(content, "#![no_std]");
+
+    // The header has to be somewhere `check` can find it again, which is the
+    // half that matters: on line two it is written once and then reported
+    // missing on every run afterwards.
+    const second = await captureOutput(() => cliMain(["check", "src/lib.rs"]));
+    assertEquals(second.exitCode, 0);
+  });
+
   it("should handle deeply nested files", async () => {
     await writeFile(
       join(env.rootDir, "src/deep/nested/path/to/file.ts"),

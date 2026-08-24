@@ -240,6 +240,55 @@ describe("replaceHeader", () => {
     const orgrinrtCount = (result.match(/orgrinrt/g) || []).length;
     assertEquals(orgrinrtCount, 0);
   });
+
+  const contributor = [{ name: "author", email: "author@example.com" }];
+
+  it("should keep a shebang first and put the header under it", () => {
+    const newHeader = generateHeader(config, contributor, 2025);
+    const result = replaceHeader("#!/usr/bin/env node\nconsole.log(1);\n", newHeader);
+
+    assertEquals(result.split("\n")[0], "#!/usr/bin/env node");
+    assertEquals(result.split("\n")[1].startsWith("//---"), true);
+  });
+
+  it("should treat a rust inner attribute as content, not as a shebang", () => {
+    const newHeader = generateHeader(config, contributor, 2025);
+
+    // `#![...]` opens the same two characters a shebang does and is not one.
+    // Read as a shebang it stays on line one and the header lands under it,
+    // where `parseHeader` will not find it, so the file fails its own check
+    // for as long as it exists.
+    for (
+      const first of [
+        "#![no_std]",
+        "#![feature(generic_const_exprs)]",
+        "#![allow(clippy::all)]",
+        "#![cfg_attr(docsrs, feature(doc_cfg))]",
+      ]
+    ) {
+      const result = replaceHeader(`${first}\npub fn f() {}\n`, newHeader);
+
+      assertEquals(result.startsWith("//---"), true, first);
+      assertEquals(result.includes(first), true, first);
+      assertEquals(hasValidHeader(result), true, first);
+    }
+  });
+
+  it("should still find the header it wrote above an inner attribute", () => {
+    // The control for the case above. Placing the header on line two leaves a
+    // file that parses to no header at all, so this is what tells the two
+    // outcomes apart rather than the ordering alone.
+    const newHeader = generateHeader(config, contributor, 2025);
+    const broken = `#![no_std]\n${newHeader}\n\npub fn f() {}\n`;
+
+    // The same header, on line one, is what a valid file looks like. Without
+    // this pair the control could be passing because the header is malformed
+    // rather than because it is in the wrong place.
+    assertEquals(hasValidHeader(`${newHeader}\n\n#![no_std]\npub fn f() {}\n`), true);
+
+    assertEquals(hasValidHeader(broken), false);
+    assertEquals(parseHeader(broken), null);
+  });
 });
 
 describe("hasContributor", () => {
