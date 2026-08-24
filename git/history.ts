@@ -1,13 +1,17 @@
 //----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+// Copyright (c) 2025-2026                    orgrinrt                    orgrinrt@ikiuni.dev
+//                                      orgrinrt                 ort@hiisi.digital
 // SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
 //----------------------------------------------------------------------------------------------------
 
 /**
- * Git history utilities for extracting contributor information.
+ * The staging area, and whether git knows a file at all.
  *
- * Most of the git history functionality is implemented in core/contributors.ts.
- * This module re-exports the relevant functions and provides additional utilities.
+ * History reading proper lives in `core/contributors.ts`, next to the selection
+ * that consumes it. What is here is what a hook needs: the staged file list and
+ * a tracked check, neither of which has anything to do with contributors.
+ *
+ * @module
  */
 
 import { getContributorsFromHistory, getCurrentGitUser, getFileYearRange } from "#core";

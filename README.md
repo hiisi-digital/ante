@@ -8,15 +8,16 @@
 [![GitHub Issues](https://img.shields.io/github/issues/hiisi-digital/ante.svg)](https://github.com/hiisi-digital/ante/issues)
 ![License](https://img.shields.io/github/license/hiisi-digital/ante?color=%23009689)
 
-> Manage copyright headers in your source files. Check, fix, and keep them consistent.
+> Copyright headers as a maintained artifact. Checked, fixed and kept consistent across a whole tree.
 
 </div>
 
-## What it does
+## What it is
 
-`ante` adds and maintains copyright headers at the top of your source files. It
-handles year ranges, contributor lists, license identifiers, and column-aligned
-formatting. Works as a CLI tool or a library.
+`ante` maintains the copyright header at the top of a source file. Year ranges,
+contributor lists, the SPDX identifier and the column alignment are all derived
+rather than typed in, and re-derived when the file changes. It runs as a command
+line tool and as a library, and the two share the same code.
 
 ```typescript
 //----------------------------------------------------------------------------------------------------
@@ -26,55 +27,83 @@ formatting. Works as a CLI tool or a library.
 //----------------------------------------------------------------------------------------------------
 ```
 
-The header format is configurable. Column positions, line width, separator
-characters, and contributor selection strategy are all controlled through your
-`deno.json`, `package.json`, or a standalone `ante.toml`.
+The format is configuration. Column positions, line width, separator character
+and how contributors are chosen come from `deno.json`, `package.json` or a
+standalone `ante.toml`, whichever the project already has.
+
+## Status
+
+Pre-1.0, so the api has not settled and breaking changes should be expected.
+Migrations get documented, and anything that changes shape does so behind a
+minor bump at the least. The header format itself is the stable part: it has not
+changed since 0.1 and there is no reason for it to.
+
+## Contents
+
+| Piece                            | What it is for                                                                              |
+| :------------------------------- | :------------------------------------------------------------------------------------------ |
+| `ante check`                     | Verifies headers and exits non-zero when any is wrong. The thing a hook or a pipeline runs. |
+| `ante fix`                       | Rewrites every header to match the configuration.                                           |
+| `ante add`                       | Puts a header on one named file.                                                            |
+| `ante init`                      | Writes a configuration and installs the git hooks.                                          |
+| `loadConfig` / `resolveConfig`   | Reads the configuration from whichever manifest holds it, and fills in what is derivable.   |
+| `generateHeader`                 | Builds a header from a configuration, a contributor list and a year.                        |
+| `parseHeader` / `hasValidHeader` | Reads a header back out of a file, and answers whether one is there and correct.            |
 
 ## Installation
 
+The command is `ante` on every runtime. The flags are the permissions it needs
+and nothing more: it reads the tree, writes headers back, and asks `git` who
+touched a file.
+
 ```bash
-# npm / yarn / pnpm (Node.js 18+)
+# deno
+deno install --global --allow-read --allow-write --allow-run=git \
+  --name ante jsr:@hiisi/ante/cli
+
+# node 18+, and bun, which installs from the same package
 npm install -g ante-cli
-yarn global add ante-cli
-pnpm add -g ante-cli
-
-# Deno (the CLI ships in the npm package; jsr:@hiisi/ante is the library)
-deno install -gAf npm:ante-cli
-
-# Or run directly without installing
-deno run -A npm:ante-cli <command>
-npx ante-cli <command>
+bun install -g ante-cli
 ```
 
-As a library:
+Or without installing anything:
+
+```bash
+deno run --allow-read --allow-write --allow-run=git jsr:@hiisi/ante/cli <command>
+npx ante-cli <command>
+bunx ante-cli <command>
+```
+
+Published to jsr and npm as of 0.2. The name is pinned with `--name` because
+deno takes `cli` for a generic file stem and would otherwise fall back to the
+directory it came from.
+
+As a library, `jsr:@hiisi/ante` on deno and `ante-cli` on node, both exporting
+the same names:
 
 ```typescript
-// Deno / JSR
 import { generateHeader, loadConfig } from "jsr:@hiisi/ante";
-
-// Node.js
-import { generateHeader, loadConfig } from "ante-cli";
 ```
 
-Or add to your project:
+Or as a dependency:
 
 ```jsonc
 // deno.json
 {
   "imports": {
-    "@hiisi/ante": "jsr:@hiisi/ante@^0.1"
+    "@hiisi/ante": "jsr:@hiisi/ante@^0.2"
   }
 }
 
 // package.json
 {
   "devDependencies": {
-    "ante-cli": "^0.1"
+    "ante-cli": "^0.2"
   }
 }
 ```
 
-## CLI Usage
+## Command line
 
 ```bash
 ante init                  # Set up config and install git hooks
@@ -85,14 +114,14 @@ ante add src/new-file.ts   # Add header to a specific file
 ante --help                # Show help
 ```
 
-Add to your project scripts:
+As project scripts:
 
 ```jsonc
 // deno.json
 {
   "tasks": {
-    "copyright:check": "deno run -A npm:ante-cli check",
-    "copyright:fix": "deno run -A npm:ante-cli fix"
+    "copyright:check": "deno run -R -W --allow-run=git jsr:@hiisi/ante/cli check",
+    "copyright:fix": "deno run -R -W --allow-run=git jsr:@hiisi/ante/cli fix"
   }
 }
 
@@ -107,7 +136,7 @@ Add to your project scripts:
 
 ## Configuration
 
-Add an `ante` section to your `deno.json` or `package.json`:
+An `ante` section in `deno.json` or `package.json` holds it:
 
 ```json
 {
@@ -126,8 +155,8 @@ Add an `ante` section to your `deno.json` or `package.json`:
 
 ### ante.toml, for projects with no JSON manifest
 
-A Rust crate, a Bash library or a C project has no `deno.json` or
-`package.json` to hold an `ante` section. Those write an `ante.toml` instead,
+A rust crate, a bash library or a c project has no `deno.json` or
+`package.json` to put an `ante` section in. Those get an `ante.toml` instead,
 where the whole file is the configuration:
 
 ```toml
@@ -148,10 +177,11 @@ own, so the SPDX identifier is read from whichever manifest sits beside it:
 `[package] license` in a `Cargo.toml`, or the top-level `license` in a JSON
 manifest. Setting `spdxLicense` in the toml overrides that.
 
-Most values have sensible defaults. The `license` field from your config file is
-used to derive `spdxLicense` and `licenseUrl` automatically.
+Most keys have a default worth keeping. `spdxLicense` and `licenseUrl` are both
+derived from the manifest's own `license` field, so neither usually needs
+setting.
 
-### Configuration Options
+### Configuration keys
 
 | Option                 | Default                       | Description                         |
 | :--------------------- | :---------------------------- | :---------------------------------- |
@@ -171,7 +201,7 @@ used to derive `spdxLicense` and `licenseUrl` automatically.
 | `include`              | `["**/*.ts", ...]`            | Files to process                    |
 | `exclude`              | `["**/node_modules/**", ...]` | Files to skip                       |
 
-### Contributor Selection Strategies
+### Contributor selection
 
 | Strategy  | Description                                      |
 | :-------- | :----------------------------------------------- |
@@ -180,30 +210,46 @@ used to derive `spdxLicense` and `licenseUrl` automatically.
 | `recent`  | Most recent contributors                         |
 | `manual`  | Use `manualContributors` list                    |
 
-## Library API
+## Library
+
+The same pieces the command line is built from, exported.
 
 ```typescript
 import {
   generateHeader,
+  getFileYearRange,
   hasValidHeader,
   loadConfig,
-  parseHeader,
-  resolveConfig,
-} from "@hiisi/ante"; // or "ante-cli" for Node.js
+  selectContributors,
+} from "@hiisi/ante"; // "ante-cli" on node
 
-// Load config from deno.json / package.json
+const file = "src/example.ts";
+
+// whichever of ante.toml, deno.json or package.json is there
 const config = await loadConfig();
 
-// Check if a file has a header
-const content = await Deno.readTextFile("src/example.ts");
+const content = await Deno.readTextFile(file);
 if (!hasValidHeader(content)) {
-  // Generate and prepend a header
-  const header = generateHeader(config, contributors, 2025);
-  await Deno.writeTextFile("src/example.ts", header + "\n" + content);
+  // both read git, so both are async and both need a repository
+  const contributors = await selectContributors(file, config);
+  const years = await getFileYearRange(file);
+
+  const header = generateHeader(
+    config,
+    contributors,
+    years?.firstYear ?? new Date().getFullYear(),
+    years?.lastYear,
+  );
+  await Deno.writeTextFile(file, `${header}\n${content}`);
 }
 ```
 
-## Git Hooks
+`parseHeader` reads an existing header back into its parts and `updateHeader`
+edits those parts, which is the path `fix` takes rather than regenerating from
+nothing. A file outside a git repository gets no contributors and no year range,
+and both calls answer with that rather than failing.
+
+## Git hooks
 
 The `init` command installs a pre-commit hook that:
 
@@ -221,11 +267,11 @@ This writes hook scripts to `.githooks/` and configures git to use them. `init`
 also installs a commit-msg hook that rejects commit messages not in Conventional
 Commits format (`type: subject`).
 
-## Year Handling
+## Years
 
-- Single year when file is created and last modified in the same year: `2025`
-- Range when modified across years: `2020-2025`
-- The end year updates automatically when you modify a file in a new year
+A file created and last modified in the same year gets a single year, `2025`. One
+modified across years gets a range, `2020-2025`, and the end of that range moves
+on its own the first time the file is touched in a new year.
 
 ## Support
 
@@ -237,13 +283,13 @@ on open-source projects like this :)
 
 ## License
 
-> You can check out the full license [here](https://github.com/hiisi-digital/ante/blob/main/LICENSE)
-
-This project is licensed under the terms of the **Mozilla Public License 2.0**.
+> The project is licensed under the **Mozilla Public License 2.0**.
 
 `SPDX-License-Identifier: MPL-2.0`
 
-## Runtime Compatibility
+> You can check out the full license [here](https://github.com/hiisi-digital/ante/blob/main/LICENSE)
+
+## Runtime compatibility
 
 | Runtime     | Versions Tested  |  Smoke  |  Types  |  Tests  |
 | ----------- | ---------------- | :-----: | :-----: | :-----: |

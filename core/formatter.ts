@@ -1,12 +1,17 @@
 //----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+// Copyright (c) 2025-2026                    orgrinrt                    orgrinrt@ikiuni.dev
+//                                      orgrinrt                 ort@hiisi.digital
 // SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
 //----------------------------------------------------------------------------------------------------
 
 /**
- * Formatting utilities for copyright headers.
+ * Putting text at a column, which is what makes a header line up.
  *
- * Provides functions for column-aligned text formatting used in headers.
+ * Columns are positions rather than widths, and content that overruns the next
+ * one is not truncated: it pushes across with a single space between, so a long
+ * name breaks the alignment of that line and nothing else.
+ *
+ * @module
  */
 
 import type { ResolvedConfig } from "./config.ts";

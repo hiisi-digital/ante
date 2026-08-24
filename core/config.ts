@@ -5,15 +5,18 @@
 //----------------------------------------------------------------------------------------------------
 
 /**
- * Configuration module for ante.
+ * Where the configuration comes from, and what is derived rather than written.
  *
- * Handles loading, resolving, and deriving configuration from:
- * - ante.toml, a standalone file for projects with no JSON manifest
- * - deno.json / package.json "ante" section
- * - Git config (user.name, user.email)
- * - Sensible defaults
+ * `ante.toml` is looked for first, because a project writes one only when it
+ * means to configure ante there, and then the `ante` section of `deno.json` or
+ * `package.json`. The SPDX identifier and its URL come from the manifest's own
+ * `license` field, and the maintainer from git's config, so a project that has
+ * already said those things once does not say them again.
  *
- * Types are generated from schema/config.schema.json - see config.generated.ts
+ * The types are generated from `schema/config.schema.json` into
+ * `config.generated.ts`, so the schema and the types cannot disagree.
+ *
+ * @module
  */
 
 // Re-export all generated types
@@ -235,9 +238,8 @@ async function findSiblingLicense(dir: string): Promise<string | undefined> {
  * 5. package.json in current directory or parents
  *
  * `ante.toml` comes first because it is unambiguous: a project only writes one
- * when it means to configure ante there. It also lets Rust, Bash and any other
- * project with no JSON manifest configure ante at all, which was previously
- * impossible.
+ * when it means to configure ante there. It is also the way a Rust, Bash or any
+ * other project with no JSON manifest configures ante.
  *
  * @param path - Optional explicit path to config file
  * @returns The loaded configuration merged with defaults

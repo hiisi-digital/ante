@@ -1,17 +1,18 @@
 //----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+// Copyright (c) 2025-2026                    orgrinrt                    orgrinrt@ikiuni.dev
 //                                      orgrinrt                 ort@hiisi.digital
 // SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
 //----------------------------------------------------------------------------------------------------
 
 /**
- * Header parsing, generation, and updating utilities.
+ * The header itself: reading one, writing one, and changing one in place.
  *
- * This module provides functions for:
- * - Parsing existing copyright headers from file content
- * - Generating new headers based on configuration
- * - Updating existing headers (year ranges, contributors)
- * - Validating header format and content
+ * `updateHeader` is the path `fix` takes rather than regenerating from nothing,
+ * because a header carries things the configuration cannot re-derive. A manual
+ * contributor nobody has committed as, or a year range predating the repository,
+ * survives an update and would not survive a rebuild.
+ *
+ * @module
  */
 
 import type { Contributor, ResolvedConfig } from "./config.ts";

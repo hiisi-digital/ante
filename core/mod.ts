@@ -1,17 +1,17 @@
 //----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+// Copyright (c) 2025-2026                    orgrinrt                    orgrinrt@ikiuni.dev
 //                                      orgrinrt                 ort@hiisi.digital
 // SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
 //----------------------------------------------------------------------------------------------------
 
 /**
- * Core module for ante - copyright header management.
+ * Everything that does not need git.
  *
- * This module exports the main functionality for:
- * - Configuration loading and resolution
- * - Header parsing, generation, and updating
- * - Column-aligned formatting
- * - Contributor management
+ * Configuration, header parsing and generation, column alignment, and the
+ * selection of contributors from a history somebody else read. The git side is
+ * `#git`, and the split is which of the two a function needs a repository for.
+ *
+ * @module
  */
 
 export * from "./config.ts";
