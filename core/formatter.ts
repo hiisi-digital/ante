@@ -29,9 +29,10 @@ export interface Column {
 /**
  * The narrowest run of spaces that still separates two fields.
  *
- * Columns are the intent and this is the floor. A name wide enough to reach the
- * email column pushes the email across, and it has to push it far enough that
- * reading the line back finds two fields rather than one.
+ * Columns are the intent and this is the floor, for a line whose content
+ * overruns the column the next field was meant to start at. The parser takes any
+ * run of whitespace, so this is what keeps such a line legible, not what keeps
+ * it readable back.
  */
 const MINIMUM_GAP = 2;
 
@@ -63,10 +64,8 @@ export function formatLine(columns: Column[]): string {
       result += " ".repeat(paddingNeeded);
       currentPos += paddingNeeded;
     } else if (currentPos > 0) {
-      // The content before this one ran past where this one starts. Two spaces
-      // is the minimum because two spaces is what separates fields when the
-      // header is read back: a single one would leave a line the parser cannot
-      // take apart, and the field after it would be dropped.
+      // The content before this one ran past where this one starts, so the
+      // column is gone and the gap is all that is left of it.
       result += " ".repeat(MINIMUM_GAP);
       currentPos += MINIMUM_GAP;
     }

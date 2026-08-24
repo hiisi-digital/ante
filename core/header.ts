@@ -100,8 +100,13 @@ function patterns(config?: ResolvedConfig): {
     // is what lets a name carry spaces of its own. It is the loosest of the
     // three patterns and is therefore tried last.
     contributor: new RegExp(`^${prefix}\\s{10,}(.+?)\\s+(\\S+@\\S+)\\s*$`),
+    // The url and the address are both optional, and so is the whitespace that
+    // would separate them. A bare `SPDX-License-Identifier: MIT` is the form the
+    // spec's own examples show and the form every tagged tree already carries,
+    // and requiring a tail left it unrecognised, preserved verbatim, and then
+    // duplicated by the line this tool writes beside it.
     spdx: new RegExp(
-      `^${prefix}\\s*SPDX-License-Identifier:\\s*(\\S+)\\s+(https?://\\S+)?\\s*(\\S+@\\S+)?`,
+      `^${prefix}\\s*SPDX-License-Identifier:\\s*(\\S+)(?:\\s+(https?://\\S+))?(?:\\s+(\\S+@\\S+))?\\s*$`,
       "i",
     ),
   };
@@ -319,9 +324,17 @@ export function updateHeader(
     }
   }
 
-  // Regenerate the header with updated info
+  // The limit bounds how long a fresh header gets. It never shortens one that
+  // is already there: a name in the file is somebody credited, and no
+  // configuration change, and no line this tool misread as a contributor, gets
+  // to take a credit away.
+  const room = {
+    ...config,
+    maxContributors: Math.max(config.maxContributors, contributors.length),
+  };
+
   return generateHeader(
-    config,
+    room,
     contributors,
     yearStart,
     yearEnd,
@@ -474,8 +487,12 @@ function replaceHeaderInContent(
  * @param email - The contributor's email to search for
  * @returns True if the contributor is in the header
  */
-export function hasContributor(content: string, email: string): boolean {
-  const parsed = parseHeader(content);
+export function hasContributor(
+  content: string,
+  email: string,
+  config?: ResolvedConfig,
+): boolean {
+  const parsed = parseHeader(content, config);
   if (!parsed) {
     return false;
   }
@@ -492,8 +509,9 @@ export function hasContributor(content: string, email: string): boolean {
  */
 export function getYearRange(
   content: string,
+  config?: ResolvedConfig,
 ): { yearStart: number; yearEnd: number } | null {
-  const parsed = parseHeader(content);
+  const parsed = parseHeader(content, config);
   if (!parsed || parsed.yearStart === 0) {
     return null;
   }

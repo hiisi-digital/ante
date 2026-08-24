@@ -42,10 +42,34 @@ function shaped(over: Partial<ResolvedConfig>): ResolvedConfig {
  * A contributor line carries no year, so the only thing telling it apart from an
  * ordinary note in the header is how far it is indented. Ten columns after the
  * comment prefix is the floor, and a name column below that produces lines the
- * parser will not claim. The sweep runs above it; `a name column the format
- * cannot express` runs below it.
+ * parser will not claim.
+ *
+ * The schema's own minimum is well above it, which is what keeps the floor
+ * unreachable through configuration. `a name column the format cannot express`
+ * is where that gap is held down.
  */
 const NARROWEST = 12;
+
+/**
+ * The ends of every configurable range, from `schema/config.schema.json`.
+ *
+ * The sweep runs the extremes rather than a comfortable middle, because the
+ * middle is where the round trip held for as long as nobody looked. A shape
+ * outside these is not one a project can ask for, so it is not swept.
+ */
+const BOUNDS = {
+  width: [60, 100, 200],
+  nameColumn: [20, 40, 100],
+  emailColumn: [40, 150],
+  licenseUrlColumn: [20, 100],
+  maintainerColumn: [50, 150],
+  maxContributors: [1, 3, 10],
+} as const;
+
+/** A column pulled back inside the range the schema permits. */
+function within(value: number, [low, high]: readonly [number, number]): number {
+  return Math.min(high, Math.max(low, value));
+}
 
 /** Names either side of the width at which one overruns its column. */
 const NAMES = [
@@ -66,11 +90,12 @@ function people(count: number): Contributor[] {
 /** Every shape the sweep covers, as a flat list so a failure names itself. */
 function shapes(): { label: string; config: ResolvedConfig; who: Contributor[] }[] {
   const out: { label: string; config: ResolvedConfig; who: Contributor[] }[] = [];
-  for (const nameColumn of [NARROWEST, NARROWEST + 1, 20, 40, 64]) {
-    for (const emailColumn of [nameColumn + 2, nameColumn + 10, nameColumn + 25, nameColumn + 60]) {
-      for (const maxContributors of [1, 2, 5]) {
-        for (const count of [1, 2, 5]) {
-          for (const width of [40, 100]) {
+  for (const nameColumn of BOUNDS.nameColumn) {
+    for (const gap of [2, 25, 50]) {
+      const emailColumn = within(nameColumn + gap, BOUNDS.emailColumn);
+      for (const maxContributors of BOUNDS.maxContributors) {
+        for (const count of [1, 3, 5]) {
+          for (const width of BOUNDS.width) {
             for (const commentPrefix of ["//", "#", "--", ";;"]) {
               for (const separatorChar of ["-", "=", "*", "~"]) {
                 const config = shaped({
@@ -81,10 +106,12 @@ function shapes(): { label: string; config: ResolvedConfig; who: Contributor[] }
                   commentPrefix,
                   separatorChar,
                   // The licence line has the same two-field geometry as a
-                  // copyright line, and the same overrun. Tying its columns to
-                  // the others sweeps it without doubling the shape count.
-                  licenseUrlColumn: nameColumn,
-                  maintainerColumn: nameColumn + 2,
+                  // copyright line and the same overrun, so it is swept
+                  // alongside rather than separately. Its two columns have
+                  // ranges of their own, so they follow the contributor columns
+                  // only as far as those ranges allow.
+                  licenseUrlColumn: within(nameColumn, BOUNDS.licenseUrlColumn),
+                  maintainerColumn: within(emailColumn + 10, BOUNDS.maintainerColumn),
                 });
                 out.push({
                   label: `nameColumn=${nameColumn} emailColumn=${emailColumn} ` +
@@ -275,12 +302,90 @@ describe("a header carrying lines this tool does not model", () => {
   });
 });
 
+describe("a line in the header this tool did not write", () => {
+  /** A header with one line spliced in under the copyright line. */
+  function spliced(config: ResolvedConfig, note: string, who: Contributor[]): string {
+    const written = generateHeader(config, who, 2020, 2026).split("\n");
+    const closing = written.pop() as string;
+    return `${[written[0], note, ...written.slice(1), closing].join("\n")}\n\nx;\n`;
+  }
+
+  it("never costs a contributor, however far the line is indented", () => {
+    // A note is told from a contributor by its indent and a trailing address,
+    // and that guess is sometimes wrong. What must not follow from a wrong
+    // guess is somebody losing their credit: a misread note that pushes a real
+    // name past the limit would delete it silently on the next repair.
+    //
+    // So the assertion is the addresses, not the count. A count cannot tell a
+    // note read as a contributor from a note read as a contributor that also
+    // evicted Alan.
+    const config = shaped({ maxContributors: 3 });
+    const who = people(3);
+    const lost: string[] = [];
+
+    for (const indent of [0, 2, 10, config.nameColumn, config.nameColumn + 10]) {
+      const note = `//${" ".repeat(indent)}Formerly maintained by old-team@example.com`;
+      const read = parseHeader(spliced(config, note, who), config);
+      const again = parseHeader(
+        `${updateHeader(read!, config, {})}\n\nx;\n`,
+        config,
+      );
+      const kept = new Set(again?.contributors.map((one) => one.email));
+
+      for (const one of who) {
+        if (!kept.has(one.email)) lost.push(`indent=${indent} lost ${one.email}`);
+      }
+    }
+
+    assertEquals(lost, []);
+  });
+
+  it("is written back once, not once per repair", () => {
+    // A line the parser does not recognise is preserved verbatim, which is
+    // right, and a line it does not recognise but writes anyway would be
+    // preserved beside the copy it writes. Each repair would add another.
+    const config = shaped({ maxContributors: 3 });
+    const note = "// SPDX-License-Identifier: MPL-2.0";
+    const once = updateHeader(parseHeader(spliced(config, note, people(2)), config)!, config, {});
+    const twice = updateHeader(parseHeader(`${once}\n\nx;\n`, config)!, config, {});
+
+    assertEquals(once, twice);
+    assertEquals(
+      once.split("\n").filter((line) => line.includes("SPDX-License-Identifier")).length,
+      1,
+    );
+  });
+
+  it("reads a bare licence tag, which carries no url and no address", () => {
+    // The form the spec's own examples show, and the form a tree tagged by
+    // anything else already carries.
+    const config = shaped({});
+    const bare = [
+      `//${"-".repeat(98)}`,
+      "// Copyright (c) 2020-2026                    Ada                     ada@example.com",
+      "// SPDX-License-Identifier: MIT",
+      `//${"-".repeat(98)}`,
+    ].join("\n");
+    const read = parseHeader(`${bare}\n\nx;\n`, config);
+
+    assertEquals(read?.spdxLicense, "MIT");
+    assertEquals(read?.extra, []);
+  });
+});
+
 describe("a name column the format cannot express", () => {
+  it("sits below every column the schema permits", () => {
+    // The floor is a property of the format and the schema is what keeps it out
+    // of reach. If a later schema lowered the minimum below the floor, the two
+    // cases underneath this one would start describing shapes a project can
+    // actually ask for.
+    assertEquals(BOUNDS.nameColumn.every((column) => column > NARROWEST), true);
+  });
+
   it("does not claim the contributor lines it writes below the floor", () => {
-    // Recorded rather than repaired. Nothing distinguishes a shallow
-    // contributor line from a note somebody wrote in the header, and guessing
-    // wrong there drops a real contributor off the end of the list, which is
-    // the failure this whole file exists to prevent.
+    // Recorded rather than repaired, and unreachable through configuration per
+    // the case above. Nothing distinguishes a shallow contributor line from a
+    // note somebody wrote in the header.
     const config = shaped({ nameColumn: NARROWEST - 1, emailColumn: 40 });
     const written = generateHeader(config, people(3), 2020, 2026);
     const read = parseHeader(`${written}\n\nconst x = 1;\n`, config);
@@ -301,8 +406,12 @@ describe("a name column the format cannot express", () => {
     // year and no keyword, so the indent and the trailing address are all there
     // is to go on, and a note wearing both is a contributor line. Indenting a
     // note less far, which is what anybody writes, keeps it a note.
-    const config = shaped({});
-    const written = generateHeader(config, people(1), 2020, 2026).split("\n");
+    //
+    // The misread is the whole of what goes wrong: `never costs a contributor`
+    // holds the part that would have mattered, which is that nobody is dropped
+    // to make room for it.
+    const config = shaped({ maxContributors: 3 });
+    const written = generateHeader(config, people(3), 2020, 2026).split("\n");
     const closing = written.pop() as string;
     const note = `//${" ".repeat(10)}See NOTICE, ask legal@example.com`;
     const read = parseHeader(
@@ -310,7 +419,7 @@ describe("a name column the format cannot express", () => {
       config,
     );
 
-    assertEquals(read?.contributors.length, 2);
+    assertEquals(read?.contributors.length, 4);
     assertEquals(read?.extra, []);
   });
 
