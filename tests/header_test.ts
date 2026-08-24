@@ -307,7 +307,7 @@ describe("a header written with no licence configured", () => {
   it({
     name: "does not certify a header whose licence is blank",
     ignore: true,
-    fn() {
+    fn(): void {
       // Catalogued rather than fixed. `validateHeader` skips the comparison
       // entirely when the configured licence is empty, so the same guard means
       // both "no licence configured" and "nothing to check", and a header the
