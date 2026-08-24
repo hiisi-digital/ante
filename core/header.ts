@@ -61,24 +61,62 @@ export interface HeaderValidation {
   issues: string[];
 }
 
-/** Regex to match separator lines */
-const SEPARATOR_REGEX = /^\/\/[-=*]+$/;
-
-/** Regex to match copyright line with year(s), name, and email (name can be multi-word) */
-const COPYRIGHT_REGEX = /^\/\/\s*Copyright\s*\(c\)\s*(\d{4})(?:-(\d{4}))?\s+(.+?)\s+(\S+@\S+)/i;
-
 /**
- * A contributor line carrying no year, indented under the first one.
+ * The line patterns, built for one configuration.
  *
- * The indent is whatever the configured name column works out to, so this asks
- * only that there be one. The name runs up to the last run of whitespace before
- * the address, which is what lets a name carry spaces of its own. It is the
- * loosest of the three line patterns and is therefore tried last.
+ * The comment prefix and the separator character are both configurable, so the
+ * patterns cannot be constants: a project writing `#` headers would otherwise
+ * have every one of them read as absent, and a header read as absent is a header
+ * about to have a second one written above it.
+ *
+ * Passing no configuration gives the shipped defaults, widened: the separator
+ * takes any of the three characters the tool has ever written, so a file keeps
+ * reading after the setting changes under it.
  */
-const CONTRIBUTOR_REGEX = /^\/\/\s{2,}(.+?)\s+(\S+@\S+)/;
+function patterns(config?: ResolvedConfig): {
+  separator: RegExp;
+  copyright: RegExp;
+  contributor: RegExp;
+  spdx: RegExp;
+} {
+  const prefix = quoted(config?.commentPrefix ?? DEFAULT_PREFIX);
+  const chars = quoted(
+    [...new Set(DEFAULT_SEPARATORS + (config?.separatorChar ?? ""))].join(""),
+  );
 
-/** Regex to match SPDX license line */
-const SPDX_REGEX = /^\/\/\s*SPDX-License-Identifier:\s*(\S+)\s+(https?:\/\/\S+)?\s*(\S+@\S+)?/i;
+  return {
+    separator: new RegExp(`^${prefix}[${chars}]+$`),
+    copyright: new RegExp(
+      `^${prefix}\\s*Copyright\\s*\\(c\\)\\s*(\\d{4})(?:-(\\d{4}))?\\s+(.+?)\\s+(\\S+@\\S+)`,
+      "i",
+    ),
+    // The indent has to be deep enough that ordinary prose in a header cannot be
+    // mistaken for a contributor. A line reading `//  ported from libfoo, ask
+    // bugs@libfoo.org` is a note, and taking it for a contributor would push a
+    // real one off the end of the list. Ten columns is the floor, and the
+    // address has to end the line.
+    //
+    // The name runs up to the last run of whitespace before the address, which
+    // is what lets a name carry spaces of its own. It is the loosest of the
+    // three patterns and is therefore tried last.
+    contributor: new RegExp(`^${prefix}\\s{10,}(.+?)\\s+(\\S+@\\S+)\\s*$`),
+    spdx: new RegExp(
+      `^${prefix}\\s*SPDX-License-Identifier:\\s*(\\S+)\\s+(https?://\\S+)?\\s*(\\S+@\\S+)?`,
+      "i",
+    ),
+  };
+}
+
+/** The comment prefix a project gets without saying anything. */
+const DEFAULT_PREFIX = "//";
+
+/** Every separator character the tool has written, so old files keep reading. */
+const DEFAULT_SEPARATORS = "-=*";
+
+/** A literal, safe to drop into a pattern. */
+function quoted(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&");
+}
 
 /**
  * Parses a copyright header from file content.
@@ -86,11 +124,15 @@ const SPDX_REGEX = /^\/\/\s*SPDX-License-Identifier:\s*(\S+)\s+(https?:\/\/\S+)?
  * @param content - The file content to parse
  * @returns The parsed header, or null if no valid header found
  */
-export function parseHeader(content: string): ParsedHeader | null {
+export function parseHeader(
+  content: string,
+  config?: ResolvedConfig,
+): ParsedHeader | null {
+  const line = patterns(config);
   const lines = content.split("\n");
 
   // Header must start with a separator line
-  if (lines.length === 0 || !SEPARATOR_REGEX.test(lines[0])) {
+  if (lines.length === 0 || !line.separator.test(lines[0])) {
     return null;
   }
 
@@ -105,16 +147,16 @@ export function parseHeader(content: string): ParsedHeader | null {
 
   // Scan for the closing separator
   for (let i = 1; i < lines.length; i++) {
-    const line = lines[i];
+    const here = lines[i];
 
     // Check for closing separator
-    if (SEPARATOR_REGEX.test(line)) {
+    if (line.separator.test(here)) {
       endLine = i + 1; // 1-indexed
       break;
     }
 
     // Check for copyright line
-    const copyrightMatch = line.match(COPYRIGHT_REGEX);
+    const copyrightMatch = here.match(line.copyright);
     if (copyrightMatch) {
       yearStart = parseInt(copyrightMatch[1], 10);
       yearEnd = copyrightMatch[2] ? parseInt(copyrightMatch[2], 10) : yearStart;
@@ -126,7 +168,7 @@ export function parseHeader(content: string): ParsedHeader | null {
     }
 
     // Check for SPDX line
-    const spdxMatch = line.match(SPDX_REGEX);
+    const spdxMatch = here.match(line.spdx);
     if (spdxMatch) {
       spdxLicense = spdxMatch[1];
       licenseUrl = spdxMatch[2] || null;
@@ -135,7 +177,7 @@ export function parseHeader(content: string): ParsedHeader | null {
     }
 
     // Check for contributor continuation line
-    const contributorMatch = line.match(CONTRIBUTOR_REGEX);
+    const contributorMatch = here.match(line.contributor);
     if (contributorMatch) {
       contributors.push({
         name: contributorMatch[1],
@@ -145,7 +187,7 @@ export function parseHeader(content: string): ParsedHeader | null {
     }
 
     // Nothing here recognises it, so keep it rather than lose it.
-    extra.push(line);
+    extra.push(here);
   }
 
   // If we didn't find a closing separator, not a valid header
@@ -293,8 +335,11 @@ export function updateHeader(
  * @param content - The file content to check
  * @returns True if a valid header is present
  */
-export function hasValidHeader(content: string): boolean {
-  const parsed = parseHeader(content);
+export function hasValidHeader(
+  content: string,
+  config?: ResolvedConfig,
+): boolean {
+  const parsed = parseHeader(content, config);
   return parsed !== null && parsed.contributors.length > 0;
 }
 
@@ -311,7 +356,7 @@ export function validateHeader(
 ): HeaderValidation {
   const issues: string[] = [];
 
-  const parsed = parseHeader(content);
+  const parsed = parseHeader(content, config);
 
   if (!parsed) {
     return { valid: false, issues: ["No valid header found"] };

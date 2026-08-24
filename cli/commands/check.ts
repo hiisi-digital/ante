@@ -74,7 +74,7 @@ async function checkFile(
   try {
     const content = await Deno.readTextFile(path);
 
-    if (!hasValidHeader(content)) {
+    if (!hasValidHeader(content, config)) {
       return {
         path,
         valid: false,

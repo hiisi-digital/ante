@@ -34,16 +34,12 @@ standalone `ante.toml`, whichever the project already has.
 ## Status
 
 Under active development, so the api hasn't settled and breaking changes should
-be expected. We'll do our best to document migrations where they're needed. The
-header format itself is the stable part and hasn't changed since 0.1.
+be expected. We'll do our best to document migrations where they're needed.
 
-Alignment did move in 0.2.3. A field that overruns its column now keeps two
-spaces after it rather than one, because one space was ambiguous and the tool
-could not read such a line back, so a long enough name lost the address beside
-it. Headers written before that still read fine, and the first `fix` after
-upgrading reformats them once. Anything in a header that ante doesn't model, a
-blank comment line or a pointer at a NOTICE file, is now kept as it was instead
-of being dropped on the rewrite.
+Two things to know about 0.2.3. A field that overruns its column keeps two
+spaces after it rather than one, so the first `fix` after upgrading reformats
+existing headers once and then holds still. And `ParsedHeader` carries a new
+`extra` field, which is a break for anything constructing one by hand.
 
 ## Contents
 
@@ -81,9 +77,10 @@ npx ante-cli <command>
 bunx ante-cli <command>
 ```
 
-Published to jsr and npm as of 0.2. The name is pinned with `--name` because
-deno takes `cli` for a generic file stem and would otherwise fall back to the
-directory it came from.
+jsr carries the current line. npm is behind at 0.1.7 and catches up with the
+next release, so a node or bun install today gets an older build than this page
+describes. The name is pinned with `--name` because deno takes `cli` for a
+generic file stem and would otherwise fall back to the directory it came from.
 
 As a library, `jsr:@hiisi/ante` on deno and `ante-cli` on node, both exporting
 the same names:
@@ -105,7 +102,7 @@ Or as a dependency:
 // package.json
 {
   "devDependencies": {
-    "ante-cli": "^0.2"
+    "ante-cli": "^0.1"
   }
 }
 ```
@@ -305,6 +302,8 @@ covered on whatever node version the machine happens to have.
 
 None of it runs on a schedule, so there's no live matrix. There is a
 [snapshot][compat] from december 2025 that went version by version across all
-three runtimes, kept for the detail rather than as a current answer.
+three runtimes, kept for the detail rather than as a current answer. It reports
+a lot of red on the node and bun rows, against a build two minor versions old,
+so read it as history.
 
 [compat]: https://github.com/hiisi-digital/ante/blob/main/COMPATIBILITY.md

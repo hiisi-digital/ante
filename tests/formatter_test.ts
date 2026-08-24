@@ -119,14 +119,14 @@ describe("padToColumn", () => {
     assertEquals(result, "Hello     ");
   });
 
-  it("should add minimum one space if text is longer than target", () => {
+  it("keeps the minimum gap when text is longer than the target", () => {
     const result = padToColumn("VeryLongText", 5);
-    assertEquals(result, "VeryLongText ");
+    assertEquals(result, "VeryLongText  ");
   });
 
-  it("should handle exact length with one space", () => {
+  it("keeps it at exact length too, where the gap would be nothing", () => {
     const result = padToColumn("Hello", 5);
-    assertEquals(result, "Hello ");
+    assertEquals(result, "Hello  ");
   });
 });
 

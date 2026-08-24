@@ -99,7 +99,11 @@ export function generateSeparator(
 }
 
 /**
- * Pads text with spaces to reach the target column position.
+ * Pads text with spaces so what follows it starts at the target column.
+ *
+ * Text already reaching the column pushes across, keeping the same minimum gap
+ * {@link formatLine} keeps, so a line built out of these reads back the same way
+ * as one built out of that.
  *
  * @param text - The text to pad
  * @param targetColumn - The target column position
@@ -107,7 +111,7 @@ export function generateSeparator(
  */
 export function padToColumn(text: string, targetColumn: number): string {
   if (text.length >= targetColumn) {
-    return text + " "; // Minimum one space
+    return text + " ".repeat(MINIMUM_GAP);
   }
   return text + " ".repeat(targetColumn - text.length);
 }

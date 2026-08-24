@@ -893,6 +893,11 @@ describe("fix repairs whatever the configuration decides", () => {
     );
   }
 
+  /** Every line of a file that reads as a separator, however it is spelled. */
+  function separators(content: string): string[] {
+    return content.split("\n").filter((one) => /^\S+[-=*~]{3,}$/.test(one));
+  }
+
   /** A file carrying a header this configuration wrote. */
   async function headered(name: string): Promise<string> {
     const path = join(env.rootDir, name);
@@ -1017,5 +1022,33 @@ describe("fix repairs whatever the configuration decides", () => {
     assertStringIncludes(after, "hand@example.com");
     assertStringIncludes(after, "2024-2026");
     assertEquals(after.split("\n")[0]!.length, 72);
+  });
+  it("does not stack a second header under a comment prefix of its own", async () => {
+    // Every line pattern used to hardcode `//`, so a `#` header read as absent
+    // and `fix` prepended another one, every run, without bound.
+    await reconfigure({ commentPrefix: "#", include: ["**/*.py"] });
+    const path = join(env.rootDir, "script.py");
+    await writeFile(path, "x = 1\n");
+    await gitCommit(env.rootDir, "Add script.py");
+
+    await captureOutput(() => cliMain(["fix"]));
+    const once = await Deno.readTextFile(path);
+    await captureOutput(() => cliMain(["fix"]));
+    await captureOutput(() => cliMain(["fix"]));
+
+    assertEquals(separators(once).length, 2);
+    assertEquals(await Deno.readTextFile(path), once);
+  });
+
+  it("does not stack one under a separator character of its own", async () => {
+    await reconfigure({ separatorChar: "~" });
+    const path = await headered("tilde.ts");
+
+    const once = await Deno.readTextFile(path);
+    await captureOutput(() => cliMain(["fix"]));
+    await captureOutput(() => cliMain(["fix"]));
+
+    assertEquals(separators(once).length, 2);
+    assertEquals(await Deno.readTextFile(path), once);
   });
 });

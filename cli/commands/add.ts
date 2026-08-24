@@ -67,7 +67,7 @@ export async function add(options: AddOptions, config: ResolvedConfig): Promise<
   }
 
   // Check for existing header
-  if (hasValidHeader(content)) {
+  if (hasValidHeader(content, config)) {
     if (!force) {
       console.log(`File already has a copyright header: ${file}`);
       console.log("Use --force to overwrite");
@@ -97,9 +97,9 @@ export async function add(options: AddOptions, config: ResolvedConfig): Promise<
 
   let newContent: string;
 
-  if (hasValidHeader(content) && force) {
+  if (hasValidHeader(content, config) && force) {
     // Force replace - parse existing and regenerate
-    const parsed = parseHeader(content);
+    const parsed = parseHeader(content, config);
     if (parsed) {
       // Merge existing contributors with current user
       const existingEmails = new Set(parsed.contributors.map((c) => c.email.toLowerCase()));

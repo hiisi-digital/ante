@@ -91,7 +91,7 @@ async function fixFile(
     const content = await Deno.readTextFile(path);
     const currentYear = new Date().getFullYear();
 
-    if (!hasValidHeader(content)) {
+    if (!hasValidHeader(content, config)) {
       // No header - create one
       const contributors: Contributor[] = currentUser ? [currentUser] : [];
 
@@ -116,7 +116,7 @@ async function fixFile(
     }
 
     // Header exists - check if updates needed
-    const parsed = parseHeader(content);
+    const parsed = parseHeader(content, config);
     if (!parsed) {
       return {
         file: path,
