@@ -1,5 +1,6 @@
 //----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+// Copyright (c) 2025-2026                    orgrinrt                    orgrinrt@ikiuni.dev
+//                                      orgrinrt                 ort@hiisi.digital
 // SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
 //----------------------------------------------------------------------------------------------------
 
@@ -278,5 +279,52 @@ describe("getYearRange", () => {
     assertEquals(range !== null, true);
     assertEquals(range!.yearStart, 2025);
     assertEquals(range!.yearEnd, 2025);
+  });
+});
+
+describe("a header written with no licence configured", () => {
+  const nameless = {
+    ...DEFAULT_CONFIG,
+    spdxLicense: "",
+    licenseUrl: "",
+    maintainerEmail: "maintainer@example.com",
+  };
+  const contributors = [{ name: "Test Author", email: "test@example.com" }];
+
+  it("writes an spdx line with nothing on it", () => {
+    // Not the wanted behaviour, recorded because it is the current one and the
+    // case below is what should replace it.
+    const header = generateHeader(nameless, contributors, 2026);
+    assertEquals(header.includes("SPDX-License-Identifier:"), true);
+    assertEquals(header.includes("SPDX-License-Identifier: "), true);
+    const line = header.split("\n").find((one) => one.includes("SPDX"))!;
+    assertEquals(
+      line.replace(/\s+/g, " ").trim(),
+      "// SPDX-License-Identifier: maintainer@example.com",
+    );
+  });
+
+  it({
+    name: "does not certify a header whose licence is blank",
+    ignore: true,
+    fn() {
+      // Catalogued rather than fixed. `validateHeader` skips the comparison
+      // entirely when the configured licence is empty, so the same guard means
+      // both "no licence configured" and "nothing to check", and a header the
+      // tool wrote with a blank identifier passes its own check.
+      //
+      // Making this green needs a decision about what happens at write time,
+      // because turning it green alone would fail every project that has never
+      // configured a licence and give them no repair path, which is the shape
+      // of the fix/check disagreement that was just removed.
+      const header = generateHeader(nameless, contributors, 2026);
+      const result = validateHeader(`${header}\n\nexport const a = 1;\n`, nameless);
+      assertEquals(result.valid, false);
+      assertEquals(
+        result.issues.some((one) => one.toLowerCase().includes("license")),
+        true,
+        `expected a licence issue, got ${JSON.stringify(result.issues)}`,
+      );
+    },
   });
 });

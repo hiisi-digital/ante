@@ -1,0 +1,76 @@
+{
+  "version": "5",
+  "specifiers": {
+    "jsr:@hiisi/flash-freeze@~0.1.1": "0.1.2",
+    "jsr:@std/fs@1": "1.0.24",
+    "jsr:@std/internal@^1.0.14": "1.0.14",
+    "jsr:@std/path@1": "1.1.6",
+    "jsr:@std/path@^1.1.5": "1.1.6",
+    "npm:web-tree-sitter@0.22.6": "0.22.6"
+  },
+  "jsr": {
+    "@hiisi/flash-freeze@0.1.2": {
+      "integrity": "0bd1f966675347f136d4eb2c1324a7d79deb54fa6ee4a73874b718883d7c25c0"
+    },
+    "@std/fs@1.0.24": {
+      "integrity": "f3061b45b81673a2bece689da041df32d174be064c89eb6397fb5718d3fb7877",
+      "dependencies": [
+        "jsr:@std/path@^1.1.5"
+      ]
+    },
+    "@std/internal@1.0.14": {
+      "integrity": "291516b3d4c35024d6ffbc0a9df5bf4c64116e05b50012cf846710152d2ffdf7"
+    },
+    "@std/path@1.1.6": {
+      "integrity": "c68485c2a4dfbb5ae3cc74fae4e8c4e5d874cf8a8ed12927917235c758b46cbe",
+      "dependencies": [
+        "jsr:@std/internal"
+      ]
+    }
+  },
+  "npm": {
+    "web-tree-sitter@0.22.6": {
+      "integrity": "sha512-hS87TH71Zd6mGAmYCvlgxeGDjqd9GTeqXNqTT+u0Gs51uIozNIaaq/kUAbV/Zf56jb2ZOyG8BxZs2GG9wbLi6Q=="
+    }
+  },
+  "workspace": {
+    "dependencies": [
+      "jsr:@hiisi/viola-default-lints@0.4",
+      "jsr:@hiisi/viola-grammar-ts@0.4",
+      "jsr:@hiisi/viola@0.4"
+    ],
+    "links": {
+      "jsr:@hiisi/viola-default-lints@0.4.0": {
+        "dependencies": [
+          "jsr:@hiisi/flash-freeze@0.1",
+          "jsr:@hiisi/viola-grammar-ts@0.4",
+          "jsr:@hiisi/viola@0.4",
+          "jsr:@std/assert@1",
+          "jsr:@std/fs@1",
+          "jsr:@std/path@1"
+        ]
+      },
+      "jsr:@hiisi/viola-grammar-ts@0.4.0": {
+        "dependencies": [
+          "jsr:@hiisi/viola-default-lints@0.4",
+          "jsr:@hiisi/viola@0.4",
+          "jsr:@std/assert@1",
+          "npm:tree-sitter-typescript@0.23.2",
+          "npm:web-tree-sitter@0.22.6"
+        ]
+      },
+      "jsr:@hiisi/viola@0.4.1": {
+        "dependencies": [
+          "jsr:@hiisi/flash-freeze@~0.1.1",
+          "jsr:@hiisi/viola-default-lints@0.4",
+          "jsr:@hiisi/viola-grammar-ts@0.4",
+          "jsr:@std/assert@1",
+          "jsr:@std/fs@1",
+          "jsr:@std/path@1",
+          "npm:tree-sitter-typescript@0.23.2",
+          "npm:web-tree-sitter@0.22.6"
+        ]
+      }
+    }
+  }
+}

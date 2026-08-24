@@ -33,10 +33,10 @@ standalone `ante.toml`, whichever the project already has.
 
 ## Status
 
-Pre-1.0, so the api has not settled and breaking changes should be expected.
-Migrations get documented, and anything that changes shape does so behind a
-minor bump at the least. The header format itself is the stable part: it has not
-changed since 0.1 and there is no reason for it to.
+Under active development, so the api hasn't settled and breaking changes should
+be expected. We'll do our best to document migrations where they're needed. The
+header format itself is the stable part, it hasn't changed since 0.1 and there's
+no reason for it to, so files already carrying one won't need rewriting.
 
 ## Contents
 
@@ -291,15 +291,13 @@ on open-source projects like this :)
 
 ## Runtime compatibility
 
-| Runtime     | Versions Tested  |  Smoke  |  Types  |  Tests  |
-| ----------- | ---------------- | :-----: | :-----: | :-----: |
-| **Deno**    | 1.x, 2.x         | partial | partial | partial |
-| **Node.js** | 18, 20, 22       |   yes   |   no    |   no    |
-| **Bun**     | 1.0, 1.1, latest |   yes   |   no    |   no    |
+Development happens on deno 2 and that's what the test suite runs under. Node
+and bun both consume the npm build, and `deno task test:node` builds it and then
+runs a smoke test, a git test and a types check against it, so those three are
+covered on whatever node version the machine happens to have.
 
-- **Smoke**: Basic import and function verification
-- **Types**: TypeScript definitions work correctly
-- **Tests**: Full unit test suite passes
+None of it runs on a schedule, so there's no live matrix. There is a
+[snapshot][compat] from december 2025 that went version by version across all
+three runtimes, kept for the detail rather than as a current answer.
 
-> See [COMPATIBILITY.md](./COMPATIBILITY.md) for version-by-version results, which are a
-> snapshot from 2025-12-12 rather than a live matrix.
+[compat]: https://github.com/hiisi-digital/ante/blob/main/COMPATIBILITY.md

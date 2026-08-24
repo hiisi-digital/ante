@@ -1,5 +1,6 @@
 //----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+// Copyright (c) 2025-2026                    orgrinrt                    orgrinrt@ikiuni.dev
+//                                      orgrinrt                 ort@hiisi.digital
 // SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
 //----------------------------------------------------------------------------------------------------
 
@@ -9,14 +10,32 @@ import { describe, it } from "@std/testing/bdd";
 import { DEFAULT_CONFIG } from "../core/config.generated.ts";
 
 describe("DEFAULT_CONFIG", () => {
-  it("should have sensible defaults", () => {
-    assertEquals(DEFAULT_CONFIG.width, 100);
-    assertEquals(DEFAULT_CONFIG.separatorChar, "-");
-    assertEquals(DEFAULT_CONFIG.commentPrefix, "//");
-    assertEquals(DEFAULT_CONFIG.nameColumn, 40);
-    assertEquals(DEFAULT_CONFIG.emailColumn, 65);
-    assertEquals(DEFAULT_CONFIG.maxContributors, 3);
-    assertEquals(DEFAULT_CONFIG.contributorSelection, "commits");
+  it("carries every default the schema declares", async () => {
+    // This used to compare the generated constants against the same numbers
+    // typed out again, which is the schema checked against a copy of itself.
+    // Reading the schema is the same test with the copy removed, and it is the
+    // one that notices when codegen and the schema part company.
+    const schema = JSON.parse(
+      await Deno.readTextFile(
+        new URL("../schema/config.schema.json", import.meta.url),
+      ),
+    ) as { properties: Record<string, { default?: unknown }> };
+
+    const declared = Object.entries(schema.properties)
+      .filter(([, one]) => one.default !== undefined && one.default !== null);
+    assertEquals(
+      declared.length > 5,
+      true,
+      `the schema should declare defaults, found ${declared.length}`,
+    );
+
+    for (const [key, one] of declared) {
+      assertEquals(
+        (DEFAULT_CONFIG as Record<string, unknown>)[key],
+        one.default,
+        `DEFAULT_CONFIG.${key} does not match the schema`,
+      );
+    }
   });
 
   it("should have default include patterns for TypeScript", () => {

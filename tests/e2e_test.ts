@@ -18,6 +18,7 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
+import { generateHeader, loadConfig, resolveConfig } from "#core";
 import { main as cliMain } from "../cli/mod.ts";
 import { createTempDir, readFile, removeDir, writeFile } from "./_utils/fs.ts";
 
@@ -765,19 +766,26 @@ describe("E2E: Configuration Handling", () => {
   });
 
   it("should respect custom width from config", async () => {
+    // The width here is deliberately not the default. Asserting against the
+    // default cannot tell a configuration being honoured from one being
+    // ignored, and the assertion is unconditional for the same reason: guarding
+    // it on finding a separator meant a run that wrote no header at all passed.
+    await writeFile(
+      join(env.rootDir, "deno.json"),
+      JSON.stringify(
+        { ...TEST_DENO_JSON, ante: { ...TEST_DENO_JSON.ante, width: 73 } },
+        null,
+        2,
+      ),
+    );
     await writeFile(join(env.rootDir, "src/width.ts"), `export const a = 1;\n`);
     await gitCommit(env.rootDir, "Add width test file");
 
     await cliMain(["fix", "src/width.ts"]);
 
-    const content = await readFile(join(env.rootDir, "src/width.ts"));
-    const lines = content.split("\n");
-    const separatorLine = lines.find((l) => /^\/\/-+$/.test(l));
-
-    if (separatorLine) {
-      // Should match configured width of 100
-      assertEquals(separatorLine.length, 100);
-    }
+    const lines = (await readFile(join(env.rootDir, "src/width.ts"))).split("\n");
+    const separator = lines.find((l) => /^\/\/[-=*]+$/.test(l));
+    assertEquals(separator?.length, 73);
   });
 
   it("should respect include patterns from config", async () => {
@@ -863,5 +871,151 @@ describe("E2E: Exclude Patterns", () => {
       line.includes("dist/bundle.js") && (line.includes("[ok]") || line.includes("[fail]"))
     );
     assertEquals(distLines.length, 0, "dist files should not be checked");
+  });
+});
+
+// ============================================================================
+// Tests: what fix repairs
+// ============================================================================
+
+describe("fix repairs whatever the configuration decides", () => {
+  let env: TestEnvironment;
+
+  /** The manifest, with `edit` applied to its `ante` block. */
+  async function reconfigure(edit: Record<string, unknown>): Promise<void> {
+    await writeFile(
+      join(env.rootDir, "deno.json"),
+      JSON.stringify(
+        { ...TEST_DENO_JSON, ante: { ...TEST_DENO_JSON.ante, ...edit } },
+        null,
+        2,
+      ),
+    );
+  }
+
+  /** A file carrying a header this configuration wrote. */
+  async function headered(name: string): Promise<string> {
+    const path = join(env.rootDir, name);
+    await writeFile(path, "export const a = 1;\n");
+    await gitCommit(env.rootDir, `Add ${name}`);
+    await captureOutput(() => cliMain(["add", name]));
+    return path;
+  }
+
+  beforeEach(async () => {
+    env = await setupBasicEnvironment();
+  });
+
+  afterEach(async () => {
+    await teardownEnvironment(env);
+  });
+
+  it("leaves a header the configuration already agrees with alone", async () => {
+    // The control for every case below. Without it each of them passes against
+    // a fix that rewrites unconditionally, which repairs everything and is
+    // wrong for a different reason: it would touch every file on every run.
+    const path = await headered("src/settled.ts");
+    const before = await readFile(path);
+
+    const { output } = await captureOutput(() => cliMain(["fix", "--verbose"]));
+
+    assertEquals(await readFile(path), before);
+    assertStringIncludes(output.join("\n"), "Unchanged: 1");
+  });
+
+  it("repairs an spdx mismatch, which check reports and fix used to ignore", async () => {
+    // A project that relicenses. `check` flagged the mismatch, `fix` had no
+    // condition for it and reported nothing to do, and the pre-commit hook
+    // `init` installs runs `check`, so every commit was blocked with the repair
+    // command insisting the file was clean.
+    const path = await headered("src/relicensed.ts");
+    await reconfigure({ spdxLicense: "Apache-2.0" });
+
+    const failed = await captureOutput(() => cliMain(["check"]));
+    assertEquals(failed.exitCode, 1);
+    assertStringIncludes(failed.output.join("\n"), "does not match config");
+
+    await captureOutput(() => cliMain(["fix"]));
+
+    assertStringIncludes(await readFile(path), "SPDX-License-Identifier: Apache-2.0");
+    assertEquals((await captureOutput(() => cliMain(["check"]))).exitCode, 0);
+  });
+
+  it("repairs a width the header was not written at", async () => {
+    const path = await headered("src/narrowed.ts");
+    const wide = (await readFile(path)).split("\n")[0]!;
+    await reconfigure({ width: 60 });
+
+    await captureOutput(() => cliMain(["fix"]));
+
+    const narrow = (await readFile(path)).split("\n")[0]!;
+    assertEquals(narrow.length, 60);
+    assertEquals(wide.length, 100);
+  });
+
+  it("repairs a separator character the header was not written with", async () => {
+    const path = await headered("src/starred.ts");
+    await reconfigure({ separatorChar: "*" });
+
+    await captureOutput(() => cliMain(["fix"]));
+
+    const first = (await readFile(path)).split("\n")[0]!;
+    assertStringIncludes(first, "****");
+    assertEquals(first.includes("---"), false);
+  });
+
+  it("repairs a column the header was not written at", async () => {
+    const path = await headered("src/shifted.ts");
+    const before = (await readFile(path)).split("\n")[1]!;
+    await reconfigure({ nameColumn: 55 });
+
+    await captureOutput(() => cliMain(["fix"]));
+
+    const after = (await readFile(path)).split("\n")[1]!;
+    assertEquals(after.indexOf("Test Author"), 55);
+    assertEquals(before.indexOf("Test Author") === 55, false);
+  });
+
+  it("is finished after one run, so a second changes nothing", async () => {
+    // Comparing the header against what the configuration would write is what
+    // decides to write at all, so a run that is not idempotent means the two
+    // disagree about something and every file would be touched forever.
+    const path = await headered("src/twice.ts");
+    await reconfigure({ width: 72, separatorChar: "=", spdxLicense: "Apache-2.0" });
+
+    await captureOutput(() => cliMain(["fix"]));
+    const once = await readFile(path);
+    const second = await captureOutput(() => cliMain(["fix", "--verbose"]));
+
+    assertEquals(await readFile(path), once);
+    assertStringIncludes(second.output.join("\n"), "Unchanged: 1");
+  });
+
+  it("keeps a contributor the configuration could not have re-derived", async () => {
+    // `updateHeader` rather than a rebuild, and this is why: a name nobody has
+    // committed as survives a repair that touches everything around it.
+    const path = join(env.rootDir, "src/manual.ts");
+    await writeFile(path, "export const a = 1;\n");
+    await gitCommit(env.rootDir, "Add manual.ts");
+
+    const config = resolveConfig(await loadConfig(env.rootDir));
+    const header = generateHeader(
+      config,
+      [
+        { name: "Test Author", email: "test@example.com" },
+        { name: "Hand Added", email: "hand@example.com" },
+      ],
+      2024,
+      2026,
+    );
+    await writeFile(path, `${header}\n\nexport const a = 1;\n`);
+
+    await reconfigure({ width: 72 });
+    await captureOutput(() => cliMain(["fix"]));
+
+    const after = await readFile(path);
+    assertStringIncludes(after, "hand@example.com");
+    assertStringIncludes(after, "2024-2026");
+    assertEquals(after.split("\n")[0]!.length, 72);
   });
 });
