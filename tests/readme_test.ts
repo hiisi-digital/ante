@@ -79,8 +79,8 @@ Deno.test("every typescript example in the readme type checks", async () => {
     `expected the readme to carry typescript examples, found ${examples.length}`,
   );
 
-  for (const [at, example] of examples.entries()) {
-    const result = await checks(example);
+  const results = await Promise.all(examples.map((example) => checks(example)));
+  for (const [at, result] of results.entries()) {
     assert(result.ok, `readme typescript block ${at + 1} does not check:\n${result.why}`);
   }
 });
