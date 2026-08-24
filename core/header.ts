@@ -40,6 +40,15 @@ export interface ParsedHeader {
   licenseUrl: string | null;
   /** Maintainer email if present */
   maintainerEmail: string | null;
+  /**
+   * Lines inside the header that none of the patterns above accounted for.
+   *
+   * A header is free to carry more than this tool understands: a blank comment
+   * line for spacing, a pointer at a NOTICE file, a second licence tag. They are
+   * kept verbatim so that rewriting the header does not delete them, and they
+   * are written back below the licence line.
+   */
+  extra: string[];
 }
 
 /**
@@ -56,10 +65,17 @@ export interface HeaderValidation {
 const SEPARATOR_REGEX = /^\/\/[-=*]+$/;
 
 /** Regex to match copyright line with year(s), name, and email (name can be multi-word) */
-const COPYRIGHT_REGEX = /^\/\/\s*Copyright\s*\(c\)\s*(\d{4})(?:-(\d{4}))?\s+(.+?)\s{2,}(\S+@\S+)/i;
+const COPYRIGHT_REGEX = /^\/\/\s*Copyright\s*\(c\)\s*(\d{4})(?:-(\d{4}))?\s+(.+?)\s+(\S+@\S+)/i;
 
-/** Regex to match contributor continuation line (no year, name can be multi-word) */
-const CONTRIBUTOR_REGEX = /^\/\/\s{10,}(.+?)\s{2,}(\S+@\S+)/;
+/**
+ * A contributor line carrying no year, indented under the first one.
+ *
+ * The indent is whatever the configured name column works out to, so this asks
+ * only that there be one. The name runs up to the last run of whitespace before
+ * the address, which is what lets a name carry spaces of its own. It is the
+ * loosest of the three line patterns and is therefore tried last.
+ */
+const CONTRIBUTOR_REGEX = /^\/\/\s{2,}(.+?)\s+(\S+@\S+)/;
 
 /** Regex to match SPDX license line */
 const SPDX_REGEX = /^\/\/\s*SPDX-License-Identifier:\s*(\S+)\s+(https?:\/\/\S+)?\s*(\S+@\S+)?/i;
@@ -82,6 +98,7 @@ export function parseHeader(content: string): ParsedHeader | null {
   let yearStart = 0;
   let yearEnd = 0;
   const contributors: Contributor[] = [];
+  const extra: string[] = [];
   let spdxLicense: string | null = null;
   let licenseUrl: string | null = null;
   let maintainerEmail: string | null = null;
@@ -108,6 +125,15 @@ export function parseHeader(content: string): ParsedHeader | null {
       continue;
     }
 
+    // Check for SPDX line
+    const spdxMatch = line.match(SPDX_REGEX);
+    if (spdxMatch) {
+      spdxLicense = spdxMatch[1];
+      licenseUrl = spdxMatch[2] || null;
+      maintainerEmail = spdxMatch[3] || null;
+      continue;
+    }
+
     // Check for contributor continuation line
     const contributorMatch = line.match(CONTRIBUTOR_REGEX);
     if (contributorMatch) {
@@ -118,14 +144,8 @@ export function parseHeader(content: string): ParsedHeader | null {
       continue;
     }
 
-    // Check for SPDX line
-    const spdxMatch = line.match(SPDX_REGEX);
-    if (spdxMatch) {
-      spdxLicense = spdxMatch[1];
-      licenseUrl = spdxMatch[2] || null;
-      maintainerEmail = spdxMatch[3] || null;
-      continue;
-    }
+    // Nothing here recognises it, so keep it rather than lose it.
+    extra.push(line);
   }
 
   // If we didn't find a closing separator, not a valid header
@@ -147,6 +167,7 @@ export function parseHeader(content: string): ParsedHeader | null {
     spdxLicense,
     licenseUrl,
     maintainerEmail,
+    extra,
   };
 }
 
@@ -157,6 +178,7 @@ export function parseHeader(content: string): ParsedHeader | null {
  * @param contributors - List of contributors to include
  * @param yearStart - The starting year for the copyright
  * @param yearEnd - The ending year (optional, defaults to yearStart)
+ * @param extra - Lines to keep verbatim below the licence line
  * @returns The generated header string
  */
 export function generateHeader(
@@ -164,6 +186,7 @@ export function generateHeader(
   contributors: Contributor[],
   yearStart: number,
   yearEnd?: number,
+  extra: string[] = [],
 ): string {
   const lines: string[] = [];
 
@@ -207,6 +230,9 @@ export function generateHeader(
 
   // SPDX line
   lines.push(formatSpdxLine(config));
+
+  // Whatever the header carried that this tool does not model, kept as it was.
+  lines.push(...extra);
 
   // Closing separator
   lines.push(
@@ -252,7 +278,13 @@ export function updateHeader(
   }
 
   // Regenerate the header with updated info
-  return generateHeader(config, contributors, yearStart, yearEnd);
+  return generateHeader(
+    config,
+    contributors,
+    yearStart,
+    yearEnd,
+    existingHeader.extra,
+  );
 }
 
 /**

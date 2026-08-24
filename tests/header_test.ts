@@ -305,7 +305,7 @@ describe("a header written with no licence configured", () => {
   });
 
   it({
-    name: "does not certify a header whose licence is blank",
+    name: "does not certify a header whose licence is blank (ante-blank-licence-certified)",
     ignore: true,
     fn(): void {
       // Catalogued rather than fixed. `validateHeader` skips the comparison
@@ -326,5 +326,36 @@ describe("a header written with no licence configured", () => {
         `expected a licence issue, got ${JSON.stringify(result.issues)}`,
       );
     },
+  });
+});
+
+describe("a header written before the gap was widened", () => {
+  // Versions up to 0.2.2 put a single space after a name that overran its
+  // column, and then could not read the line back. The contributor on it was
+  // dropped on the next repair. Those files are still on disk, so the parser
+  // takes one space even though the formatter no longer writes one.
+  const legacy = [
+    "//----------------------------------------",
+    "// Copyright (c) 2020-2026                  orgrinrt                  ort@hiisi.digital",
+    "//                                      Jean-Baptiste Grenouille jb@example.com",
+    "// SPDX-License-Identifier: MIT      https://opensource.org/licenses/MIT c@x.dev",
+    "//----------------------------------------",
+    "",
+    "const x = 1;",
+  ].join("\n");
+
+  it("still yields every contributor on it", () => {
+    const parsed = parseHeader(legacy);
+    assertEquals(parsed?.contributors, [
+      { name: "orgrinrt", email: "ort@hiisi.digital" },
+      { name: "Jean-Baptiste Grenouille", email: "jb@example.com" },
+    ]);
+  });
+
+  it("still yields the licence it names", () => {
+    const parsed = parseHeader(legacy);
+    assertEquals(parsed?.spdxLicense, "MIT");
+    assertEquals(parsed?.licenseUrl, "https://opensource.org/licenses/MIT");
+    assertEquals(parsed?.maintainerEmail, "c@x.dev");
   });
 });

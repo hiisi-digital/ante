@@ -8,8 +8,8 @@
  * Putting text at a column, which is what makes a header line up.
  *
  * Columns are positions rather than widths, and content that overruns the next
- * one is not truncated: it pushes across with a single space between, so a long
- * name breaks the alignment of that line and nothing else.
+ * one is not truncated: it pushes across, keeping the gap that separates two
+ * fields, so a long name breaks the alignment of that line and nothing else.
  *
  * @module
  */
@@ -27,9 +27,19 @@ export interface Column {
 }
 
 /**
+ * The narrowest run of spaces that still separates two fields.
+ *
+ * Columns are the intent and this is the floor. A name wide enough to reach the
+ * email column pushes the email across, and it has to push it far enough that
+ * reading the line back finds two fields rather than one.
+ */
+const MINIMUM_GAP = 2;
+
+/**
  * Formats a line with content aligned to specified column positions.
  * Content is placed at each column position, with spaces filling gaps.
- * If content overlaps the next column, a single space is used as minimum separator.
+ * Content that overruns the next column pushes it across, keeping the minimum
+ * gap that separates two fields.
  *
  * @param columns - Array of column definitions, should be sorted by position
  * @returns The formatted line string
@@ -49,13 +59,16 @@ export function formatLine(columns: Column[]): string {
     // Calculate padding needed to reach column position
     const paddingNeeded = col.position - currentPos;
 
-    if (paddingNeeded > 0) {
+    if (paddingNeeded >= MINIMUM_GAP) {
       result += " ".repeat(paddingNeeded);
       currentPos += paddingNeeded;
-    } else if (currentPos > 0 && paddingNeeded <= 0) {
-      // Content overlaps, add minimum single space
-      result += " ";
-      currentPos += 1;
+    } else if (currentPos > 0) {
+      // The content before this one ran past where this one starts. Two spaces
+      // is the minimum because two spaces is what separates fields when the
+      // header is read back: a single one would leave a line the parser cannot
+      // take apart, and the field after it would be dropped.
+      result += " ".repeat(MINIMUM_GAP);
+      currentPos += MINIMUM_GAP;
     }
 
     result += col.content;

@@ -50,9 +50,6 @@ interface FixResult {
 }
 
 /**
- * Fixes a single file's header.
- */
-/**
  * What changed, for the verbose listing. Not what decides to write: that is the
  * comparison in `fixFile`, and this only puts names to the parts of it a reader
  * would recognise.
@@ -81,6 +78,9 @@ function named(
   return updates;
 }
 
+/**
+ * Fixes a single file's header.
+ */
 async function fixFile(
   path: string,
   config: ResolvedConfig,

@@ -35,8 +35,15 @@ standalone `ante.toml`, whichever the project already has.
 
 Under active development, so the api hasn't settled and breaking changes should
 be expected. We'll do our best to document migrations where they're needed. The
-header format itself is the stable part, it hasn't changed since 0.1 and there's
-no reason for it to, so files already carrying one won't need rewriting.
+header format itself is the stable part and hasn't changed since 0.1.
+
+Alignment did move in 0.2.3. A field that overruns its column now keeps two
+spaces after it rather than one, because one space was ambiguous and the tool
+could not read such a line back, so a long enough name lost the address beside
+it. Headers written before that still read fine, and the first `fix` after
+upgrading reformats them once. Anything in a header that ante doesn't model, a
+blank comment line or a pointer at a NOTICE file, is now kept as it was instead
+of being dropped on the rewrite.
 
 ## Contents
 
