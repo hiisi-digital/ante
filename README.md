@@ -36,7 +36,7 @@ standalone `ante.toml`, whichever the project already has.
 Under active development, so the api hasn't settled and breaking changes should
 be expected. We'll do our best to document migrations where they're needed.
 
-Three things to know about 0.2.3. A field that overruns its column keeps two
+Three things to know about 0.3.0. A field that overruns its column keeps two
 spaces after it rather than one, so the first `fix` after upgrading reformats
 existing headers once and then holds still. `ParsedHeader` carries a new `extra`
 field, which is a break for anything constructing one by hand. And a header block
@@ -44,6 +44,20 @@ written to somebody else's convention is now kept: whatever `ante` cannot model
 in it comes through the rewrite verbatim, where earlier versions replaced the
 whole block. If a tree has been through an older `fix`, its third-party notices
 are worth a look before this one runs.
+
+### One thing it does not keep
+
+The licence a file declares is not preserved. `ante` writes the licence the
+project configured, so a vendored file saying `SPDX-License-Identifier: ISC`
+comes out saying whatever is in the manifest. Measured against 244 header blocks
+taken from vendored source, 98 of them are in that class.
+
+Nothing is deleted and it is stable across runs, and it is still the tool making
+a false statement about somebody else's code, which is the one output here that
+is expensive to find out about late. So keep vendored trees out of `include`, or
+in `exclude`, until this settles. What `ante` should do instead is an open
+question rather than an oversight: refuse the file, skip it, carry the
+declaration through as a line it does not model, or keep stamping over it.
 
 ## Contents
 
@@ -82,7 +96,7 @@ npx ante-cli <command>
 bunx ante-cli <command>
 ```
 
-The `./cli` entry point is there as of 0.2.3, on both registries, so all six
+The `./cli` entry point is there as of 0.3.0, on both registries, so all six
 lines above work. The name is pinned with `--name` because deno reads `cli` as a
 generic file stem and would otherwise call the command after the directory it
 came from.
@@ -100,14 +114,14 @@ Or as a dependency:
 // deno.json
 {
   "imports": {
-    "@hiisi/ante": "jsr:@hiisi/ante@^0.2"
+    "@hiisi/ante": "jsr:@hiisi/ante@^0.3"
   }
 }
 
 // package.json
 {
   "devDependencies": {
-    "ante-cli": "^0.2"
+    "ante-cli": "^0.3"
   }
 }
 ```
