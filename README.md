@@ -77,10 +77,12 @@ npx ante-cli <command>
 bunx ante-cli <command>
 ```
 
-jsr carries the current line. npm is behind at 0.1.7 and catches up with the
-next release, so a node or bun install today gets an older build than this page
-describes. The name is pinned with `--name` because deno takes `cli` for a
-generic file stem and would otherwise fall back to the directory it came from.
+The `./cli` entry point arrives with 0.2.3. Until that is out, the deno lines
+above resolve against 0.2.2, which exports the library and not the command, and
+they fail. npm is further behind at 0.1.7, so a node or bun install today gets an
+older build than this page describes. Both catch up at the next release. The name
+is pinned with `--name` because deno takes `cli` for a generic file stem and
+would otherwise fall back to the directory it came from.
 
 As a library, `jsr:@hiisi/ante` on deno and `ante-cli` on node, both exporting
 the same names:

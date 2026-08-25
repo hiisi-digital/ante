@@ -209,6 +209,29 @@ async function main(): Promise<void> {
   lines.push("};");
   lines.push("");
 
+  // Bounds table
+  lines.push("/**");
+  lines.push(" * The range each numeric option is declared to hold, straight from the schema.");
+  lines.push(" *");
+  lines.push(" * The schema is where the ranges are written and it is not consulted at");
+  lines.push(" * runtime, so a bound that lived only there was a comment. Emitting it here");
+  lines.push(" * puts it somewhere the loader can read, which is the same reason the types");
+  lines.push(" * are generated rather than written twice.");
+  lines.push(" */");
+  lines.push(
+    "export const CONFIG_BOUNDS: Readonly<Record<string, { min: number; max: number }>> = {",
+  );
+
+  for (const [propName, prop] of Object.entries(schema.properties)) {
+    if (prop.minimum === undefined && prop.maximum === undefined) continue;
+    const min = prop.minimum ?? Number.NEGATIVE_INFINITY;
+    const max = prop.maximum ?? Number.POSITIVE_INFINITY;
+    lines.push(`  ${propName}: { min: ${min}, max: ${max} },`);
+  }
+
+  lines.push("};");
+  lines.push("");
+
   // ResolvedConfig type
   lines.push("/** Fully resolved configuration with all values populated. */");
   lines.push("export type ResolvedConfig = Required<AnteConfig>;");

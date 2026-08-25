@@ -27,10 +27,10 @@ export type {
   ResolvedConfig,
 } from "./config.generated.ts";
 
-export { DEFAULT_CONFIG } from "./config.generated.ts";
+export { CONFIG_BOUNDS, DEFAULT_CONFIG } from "./config.generated.ts";
 
 import type { AnteConfig, ResolvedConfig } from "./config.generated.ts";
-import { DEFAULT_CONFIG } from "./config.generated.ts";
+import { CONFIG_BOUNDS, DEFAULT_CONFIG } from "./config.generated.ts";
 import { parse as parseToml } from "@std/toml";
 import { run } from "./run.ts";
 
@@ -316,11 +316,19 @@ export async function loadConfig(path?: string): Promise<ResolvedConfig> {
 /**
  * Resolves a partial configuration by merging with defaults.
  *
+ * Every numeric option the schema gives a range to is checked against it, and a
+ * value outside its range throws rather than being clamped or passed through.
+ * The ranges are not decoration: a width of 3 has no room for a name, and a name
+ * column past the width puts the name outside the line, so what comes out is a
+ * header nobody can read from a file that looked configured. Clamping would be
+ * worse than either, since the file would say one thing and the output another.
+ *
  * @param partial - Partial configuration object
  * @returns Complete configuration with defaults applied
+ * @throws If a numeric option falls outside the range the schema declares
  */
 export function resolveConfig(partial: Partial<AnteConfig>): ResolvedConfig {
-  return {
+  const merged: ResolvedConfig = {
     ...DEFAULT_CONFIG,
     ...partial,
     // Ensure arrays are not undefined
@@ -328,4 +336,20 @@ export function resolveConfig(partial: Partial<AnteConfig>): ResolvedConfig {
     include: partial.include ?? DEFAULT_CONFIG.include,
     exclude: partial.exclude ?? DEFAULT_CONFIG.exclude,
   };
+
+  for (const [key, { min, max }] of Object.entries(CONFIG_BOUNDS)) {
+    const value = (merged as Record<string, unknown>)[key];
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      throw new Error(
+        `ante config: ${key} has to be a number, and it is ${JSON.stringify(value)}.`,
+      );
+    }
+    if (value < min || value > max) {
+      throw new Error(
+        `ante config: ${key} is ${value}, and it has to be between ${min} and ${max}.`,
+      );
+    }
+  }
+
+  return merged;
 }
