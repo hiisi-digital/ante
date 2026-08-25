@@ -12,7 +12,6 @@
 
 import type { Contributor, ResolvedConfig } from "#core";
 import {
-  generateHeader,
   getCurrentGitUser,
   getFileYearRange,
   hasValidHeader,
