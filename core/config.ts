@@ -5,15 +5,18 @@
 //----------------------------------------------------------------------------------------------------
 
 /**
- * Configuration module for ante.
+ * Where the configuration comes from, and what is derived rather than written.
  *
- * Handles loading, resolving, and deriving configuration from:
- * - ante.toml, a standalone file for projects with no JSON manifest
- * - deno.json / package.json "ante" section
- * - Git config (user.name, user.email)
- * - Sensible defaults
+ * `ante.toml` is looked for first, because a project writes one only when it
+ * means to configure ante there, and then the `ante` section of `deno.json` or
+ * `package.json`. The SPDX identifier and its URL come from the manifest's own
+ * `license` field, and the maintainer from git's config, so a project that has
+ * already said those things once does not say them again.
  *
- * Types are generated from schema/config.schema.json - see config.generated.ts
+ * The types are generated from `schema/config.schema.json` into
+ * `config.generated.ts`, so the schema and the types cannot disagree.
+ *
+ * @module
  */
 
 // Re-export all generated types
@@ -24,10 +27,10 @@ export type {
   ResolvedConfig,
 } from "./config.generated.ts";
 
-export { DEFAULT_CONFIG } from "./config.generated.ts";
+export { CONFIG_BOUNDS, DEFAULT_CONFIG } from "./config.generated.ts";
 
 import type { AnteConfig, ResolvedConfig } from "./config.generated.ts";
-import { DEFAULT_CONFIG } from "./config.generated.ts";
+import { CONFIG_BOUNDS, DEFAULT_CONFIG } from "./config.generated.ts";
 import { parse as parseToml } from "@std/toml";
 import { run } from "./run.ts";
 
@@ -65,6 +68,12 @@ const LICENSE_URLS: Record<string, string> = {
  */
 export function deriveLicenseUrl(spdx: string): string {
   if (!spdx) return "";
+  // A compound expression names no single page. `MIT OR Apache-2.0` has an
+  // entry for each half and none for the pair, so the guessed link would be a
+  // 404 with spaces in it, and a url with spaces in it is not a url: the header
+  // it lands in reads back as one long licence expression and then disagrees
+  // with the configuration it was written from, permanently.
+  if (!/^[A-Za-z0-9.+-]+$/.test(spdx)) return "";
   return LICENSE_URLS[spdx] ?? `https://spdx.org/licenses/${spdx}.html`;
 }
 
@@ -235,9 +244,8 @@ async function findSiblingLicense(dir: string): Promise<string | undefined> {
  * 5. package.json in current directory or parents
  *
  * `ante.toml` comes first because it is unambiguous: a project only writes one
- * when it means to configure ante there. It also lets Rust, Bash and any other
- * project with no JSON manifest configure ante at all, which was previously
- * impossible.
+ * when it means to configure ante there. It is also the way a Rust, Bash or any
+ * other project with no JSON manifest configures ante.
  *
  * @param path - Optional explicit path to config file
  * @returns The loaded configuration merged with defaults
@@ -308,11 +316,19 @@ export async function loadConfig(path?: string): Promise<ResolvedConfig> {
 /**
  * Resolves a partial configuration by merging with defaults.
  *
+ * Every numeric option the schema gives a range to is checked against it, and a
+ * value outside its range throws rather than being clamped or passed through.
+ * The ranges are not decoration: a width of 3 has no room for a name, and a name
+ * column past the width puts the name outside the line, so what comes out is a
+ * header nobody can read from a file that looked configured. Clamping would be
+ * worse than either, since the file would say one thing and the output another.
+ *
  * @param partial - Partial configuration object
  * @returns Complete configuration with defaults applied
+ * @throws If a numeric option falls outside the range the schema declares
  */
 export function resolveConfig(partial: Partial<AnteConfig>): ResolvedConfig {
-  return {
+  const merged: ResolvedConfig = {
     ...DEFAULT_CONFIG,
     ...partial,
     // Ensure arrays are not undefined
@@ -320,4 +336,20 @@ export function resolveConfig(partial: Partial<AnteConfig>): ResolvedConfig {
     include: partial.include ?? DEFAULT_CONFIG.include,
     exclude: partial.exclude ?? DEFAULT_CONFIG.exclude,
   };
+
+  for (const [key, { min, max }] of Object.entries(CONFIG_BOUNDS)) {
+    const value = (merged as Record<string, unknown>)[key];
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      throw new Error(
+        `ante config: ${key} has to be a number, and it is ${JSON.stringify(value)}.`,
+      );
+    }
+    if (value < min || value > max) {
+      throw new Error(
+        `ante config: ${key} is ${value}, and it has to be between ${min} and ${max}.`,
+      );
+    }
+  }
+
+  return merged;
 }

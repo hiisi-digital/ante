@@ -12,12 +12,12 @@
 
 import type { Contributor, ResolvedConfig } from "#core";
 import {
-  generateHeader,
   getCurrentGitUser,
   getFileYearRange,
   hasValidHeader,
   parseHeader,
   replaceHeader,
+  rewriteHeader,
   updateHeader,
 } from "#core";
 
@@ -67,7 +67,7 @@ export async function add(options: AddOptions, config: ResolvedConfig): Promise<
   }
 
   // Check for existing header
-  if (hasValidHeader(content)) {
+  if (hasValidHeader(content, config)) {
     if (!force) {
       console.log(`File already has a copyright header: ${file}`);
       console.log("Use --force to overwrite");
@@ -97,9 +97,9 @@ export async function add(options: AddOptions, config: ResolvedConfig): Promise<
 
   let newContent: string;
 
-  if (hasValidHeader(content) && force) {
+  if (hasValidHeader(content, config) && force) {
     // Force replace - parse existing and regenerate
-    const parsed = parseHeader(content);
+    const parsed = parseHeader(content, config);
     if (parsed) {
       // Merge existing contributors with current user
       const existingEmails = new Set(parsed.contributors.map((c) => c.email.toLowerCase()));
@@ -114,16 +114,14 @@ export async function add(options: AddOptions, config: ResolvedConfig): Promise<
         newContributor: currentUser,
         updateYear: currentYear,
       });
-      newContent = replaceHeader(content, updatedHeader, parsed);
+      newContent = replaceHeader(content, updatedHeader, parsed, config);
     } else {
-      // Can't parse, just regenerate
-      const header = generateHeader(config, contributors, yearStart, yearEnd);
-      newContent = replaceHeader(content, header);
+      // Can't read it, so write a fresh one carrying whatever it said.
+      newContent = rewriteHeader(content, config, contributors, yearStart, yearEnd);
     }
   } else {
     // No existing header - create new one
-    const header = generateHeader(config, contributors, yearStart, yearEnd);
-    newContent = replaceHeader(content, header);
+    newContent = rewriteHeader(content, config, contributors, yearStart, yearEnd);
   }
 
   // Write the file

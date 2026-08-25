@@ -26,4 +26,4 @@
  * console.log(`ante v${VERSION}`);
  * ```
  */
-export const VERSION: string = "0.2.2";
+export const VERSION: string = "0.2.3";

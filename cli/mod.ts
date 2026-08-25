@@ -5,13 +5,14 @@
 //----------------------------------------------------------------------------------------------------
 
 /**
- * CLI entry point for ante.
+ * The command line, which is argument parsing over `#core` and `#git`.
  *
- * Provides commands for managing copyright headers:
- * - init: Set up configuration and install git hooks
- * - check: Verify headers are present and valid
- * - fix: Add or update headers across files
- * - add: Add header to a specific file
+ * Four commands: `init` writes a configuration and the hooks, `check` verifies
+ * and exits non-zero when anything is wrong, `fix` rewrites every header, and
+ * `add` puts one on a named file. No logic lives here that the library does not
+ * already export.
+ *
+ * @module
  */
 
 import { loadConfig, VERSION } from "#core";
@@ -19,8 +20,6 @@ import { add } from "./commands/add.ts";
 import { runCheck } from "./commands/check.ts";
 import { runFix } from "./commands/fix.ts";
 import { runInit } from "./commands/init.ts";
-
-// VERSION is imported from #core and read from deno.json
 
 /** Available commands */
 type Command = "init" | "check" | "fix" | "add" | "help" | "version";

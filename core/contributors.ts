@@ -1,13 +1,18 @@
 //----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+// Copyright (c) 2025-2026                    orgrinrt                    orgrinrt@ikiuni.dev
+//                                      orgrinrt                 ort@hiisi.digital
 // SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
 //----------------------------------------------------------------------------------------------------
 
 /**
- * Contributor management for ante.
+ * Who ends up in a header, out of everyone who has touched the file.
  *
- * Handles extraction, selection, and formatting of contributors
- * for copyright headers based on configured strategies.
+ * A header has room for a few names and a file can have many, so the choice is a
+ * strategy: most commits, most lines, most recent, or a list written by hand.
+ * The ranking is over one file's history rather than the repository's, so a
+ * file's header names the people who worked on that file.
+ *
+ * @module
  */
 
 import type { AnteConfig, Contributor, ContributorSelection } from "./config.ts";

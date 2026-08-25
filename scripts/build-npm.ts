@@ -1,5 +1,5 @@
 //----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+// Copyright (c) 2025-2026                    orgrinrt                    orgrinrt@ikiuni.dev
 //                                      orgrinrt                 ort@hiisi.digital
 // SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
 //----------------------------------------------------------------------------------------------------
@@ -79,7 +79,7 @@ try {
       name: NPM_PACKAGE_NAME,
       version: denoJson.version,
       description:
-        "Manage copyright headers in your source files. Check, fix, and keep them consistent.",
+        "Copyright headers as a maintained artifact. Checked, fixed and kept consistent across a whole tree.",
       license: denoJson.license,
       type: "module",
       repository: {

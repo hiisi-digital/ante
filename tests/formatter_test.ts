@@ -1,5 +1,6 @@
 //----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+// Copyright (c) 2025-2026                    orgrinrt                    orgrinrt@ikiuni.dev
+//                                      orgrinrt                 ort@hiisi.digital
 // SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
 //----------------------------------------------------------------------------------------------------
 
@@ -44,14 +45,31 @@ describe("formatLine", () => {
     assertEquals(result.indexOf("Third"), 20);
   });
 
-  it("should handle overlapping columns with minimum spacing", () => {
+  it("pushes an overrun column across, keeping two spaces", () => {
     const columns: Column[] = [
       { content: "VeryLongContent", position: 0 },
       { content: "Next", position: 5 },
     ];
     const result = formatLine(columns);
-    // Should have at least one space between overlapping content
-    assertEquals(result.includes("VeryLongContent Next"), true);
+    // Two, not one. A single space leaves a line that reads back as one field
+    // instead of two, and the second one is then lost.
+    assertEquals(result, "VeryLongContent  Next");
+  });
+
+  it("widens a column asked for closer than two spaces", () => {
+    const result = formatLine([
+      { content: "ab", position: 0 },
+      { content: "cd", position: 3 },
+    ]);
+    assertEquals(result, "ab  cd");
+  });
+
+  it("honours a gap of exactly two", () => {
+    const result = formatLine([
+      { content: "ab", position: 0 },
+      { content: "cd", position: 4 },
+    ]);
+    assertEquals(result, "ab  cd");
   });
 
   it("should sort columns by position", () => {
@@ -101,14 +119,14 @@ describe("padToColumn", () => {
     assertEquals(result, "Hello     ");
   });
 
-  it("should add minimum one space if text is longer than target", () => {
+  it("keeps the minimum gap when text is longer than the target", () => {
     const result = padToColumn("VeryLongText", 5);
-    assertEquals(result, "VeryLongText ");
+    assertEquals(result, "VeryLongText  ");
   });
 
-  it("should handle exact length with one space", () => {
+  it("keeps it at exact length too, where the gap would be nothing", () => {
     const result = padToColumn("Hello", 5);
-    assertEquals(result, "Hello ");
+    assertEquals(result, "Hello  ");
   });
 });
 

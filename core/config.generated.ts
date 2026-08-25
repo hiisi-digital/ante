@@ -69,5 +69,22 @@ export const DEFAULT_CONFIG: Required<AnteConfig> = {
   exclude: ["**/node_modules/**", "**/dist/**", "**/build/**", "**/coverage/**"],
 };
 
+/**
+ * The range each numeric option is declared to hold, straight from the schema.
+ *
+ * The schema is where the ranges are written and it is not consulted at
+ * runtime, so a bound that lived only there was a comment. Emitting it here
+ * puts it somewhere the loader can read, which is the same reason the types
+ * are generated rather than written twice.
+ */
+export const CONFIG_BOUNDS: Readonly<Record<string, { min: number; max: number }>> = {
+  width: { min: 60, max: 200 },
+  nameColumn: { min: 20, max: 100 },
+  emailColumn: { min: 40, max: 150 },
+  licenseUrlColumn: { min: 20, max: 100 },
+  maintainerColumn: { min: 50, max: 150 },
+  maxContributors: { min: 1, max: 10 },
+};
+
 /** Fully resolved configuration with all values populated. */
 export type ResolvedConfig = Required<AnteConfig>;

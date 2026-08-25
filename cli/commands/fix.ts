@@ -11,14 +11,14 @@
  * Adds missing headers, updates outdated ones, and ensures consistency.
  */
 
-import type { Contributor, ResolvedConfig } from "#core";
+import type { Contributor, ParsedHeader, ResolvedConfig } from "#core";
 import {
-  generateHeader,
   getCurrentGitUser,
   getFileYearRange,
   hasValidHeader,
   parseHeader,
   replaceHeader,
+  rewriteHeader,
   updateHeader,
 } from "#core";
 import { findFilesRecursive } from "./_files.ts";
@@ -50,6 +50,35 @@ interface FixResult {
 }
 
 /**
+ * What changed, for the verbose listing. Not what decides to write: that is the
+ * comparison in `fixFile`, and this only puts names to the parts of it a reader
+ * would recognise.
+ */
+function named(
+  parsed: ParsedHeader,
+  config: ResolvedConfig,
+  currentUser: Contributor | null,
+  currentYear: number,
+): string[] {
+  const updates: string[] = [];
+  if (parsed.yearEnd < currentYear) {
+    updates.push(`Update year to ${parsed.yearStart}-${currentYear}`);
+  }
+  if (
+    currentUser && !parsed.contributors.some(
+      (one) => one.email.toLowerCase() === currentUser.email.toLowerCase(),
+    )
+  ) {
+    updates.push(`Add contributor: ${currentUser.name}`);
+  }
+  if (config.spdxLicense && parsed.spdxLicense !== config.spdxLicense) {
+    updates.push(`Set SPDX license to ${config.spdxLicense}`);
+  }
+  if (updates.length === 0) updates.push("Reformat to match the configuration");
+  return updates;
+}
+
+/**
  * Fixes a single file's header.
  */
 async function fixFile(
@@ -62,7 +91,7 @@ async function fixFile(
     const content = await Deno.readTextFile(path);
     const currentYear = new Date().getFullYear();
 
-    if (!hasValidHeader(content)) {
+    if (!hasValidHeader(content, config)) {
       // No header - create one
       const contributors: Contributor[] = currentUser ? [currentUser] : [];
 
@@ -71,8 +100,13 @@ async function fixFile(
       const yearStart = yearRange?.firstYear ?? currentYear;
       const yearEnd = yearRange?.lastYear ?? currentYear;
 
-      const header = generateHeader(config, contributors, yearStart, yearEnd);
-      const newContent = replaceHeader(content, header);
+      const newContent = rewriteHeader(
+        content,
+        config,
+        contributors,
+        yearStart,
+        yearEnd,
+      );
 
       if (!dryRun) {
         await Deno.writeTextFile(path, newContent);
@@ -87,7 +121,7 @@ async function fixFile(
     }
 
     // Header exists - check if updates needed
-    const parsed = parseHeader(content);
+    const parsed = parseHeader(content, config);
     if (!parsed) {
       return {
         file: path,
@@ -97,27 +131,17 @@ async function fixFile(
       };
     }
 
-    let needsUpdate = false;
-    const updates: string[] = [];
+    // What the header should be, and the only thing that decides whether to
+    // write. A list of conditions here was the same list twice, and the two
+    // drifted: `check` reported an spdx mismatch that `fix` had no condition
+    // for, so the repair command said there was nothing to repair and a
+    // pre-commit hook running `check` blocked every commit after a relicense.
+    const updatedHeader = updateHeader(parsed, config, {
+      newContributor: currentUser ?? undefined,
+      updateYear: currentYear,
+    });
 
-    // Check if year needs updating
-    if (parsed.yearEnd < currentYear) {
-      needsUpdate = true;
-      updates.push(`Update year to ${parsed.yearStart}-${currentYear}`);
-    }
-
-    // Check if current user needs to be added
-    if (currentUser) {
-      const hasCurrentUser = parsed.contributors.some(
-        (c) => c.email.toLowerCase() === currentUser.email.toLowerCase(),
-      );
-      if (!hasCurrentUser) {
-        needsUpdate = true;
-        updates.push(`Add contributor: ${currentUser.name}`);
-      }
-    }
-
-    if (!needsUpdate) {
+    if (updatedHeader === parsed.raw) {
       return {
         file: path,
         modified: false,
@@ -125,12 +149,8 @@ async function fixFile(
       };
     }
 
-    // Update the header
-    const updatedHeader = updateHeader(parsed, config, {
-      newContributor: currentUser ?? undefined,
-      updateYear: currentYear,
-    });
-    const newContent = replaceHeader(content, updatedHeader, parsed);
+    const updates = named(parsed, config, currentUser, currentYear);
+    const newContent = replaceHeader(content, updatedHeader, parsed, config);
 
     if (!dryRun) {
       await Deno.writeTextFile(path, newContent);

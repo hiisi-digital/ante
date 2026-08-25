@@ -1,13 +1,18 @@
 //----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+// Copyright (c) 2025-2026                    orgrinrt                    orgrinrt@ikiuni.dev
+//                                      orgrinrt                 ort@hiisi.digital
 // SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
 //----------------------------------------------------------------------------------------------------
 
 /**
- * Git hooks management for ante.
+ * The hooks, generated as shell scripts and installed into `.githooks/`.
  *
- * Provides functions for generating, installing, and managing git hooks
- * that enforce copyright header policies.
+ * They are written out rather than shipped so they carry the configuration they
+ * were generated against, and installed by pointing `core.hooksPath` at the
+ * directory rather than by writing into `.git/hooks`, which keeps them in the
+ * repository and reviewable.
+ *
+ * @module
  */
 
 import type { ResolvedConfig } from "#core";
