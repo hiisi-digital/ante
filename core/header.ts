@@ -79,17 +79,9 @@ function patterns(config?: ResolvedConfig): {
   contributor: RegExp;
   spdx: RegExp;
 } {
-  const written = config?.commentPrefix ?? DEFAULT_PREFIX;
-  const prefix = quoted(written);
+  const prefix = quoted(config?.commentPrefix ?? DEFAULT_PREFIX);
   const chars = quoted(
     [...new Set(DEFAULT_SEPARATORS + (config?.separatorChar ?? ""))].join(""),
-  );
-  // How far a contributor line is indented, which is the name column less what
-  // the prefix already occupies. At least one, because a column at or inside the
-  // prefix leaves no gap at all and the pattern would then claim every line.
-  const indent = Math.max(
-    1,
-    (config?.nameColumn ?? DEFAULT_NAME_COLUMN) - written.length,
   );
 
   return {
@@ -98,15 +90,17 @@ function patterns(config?: ResolvedConfig): {
       `^${prefix}\\s*Copyright\\s*\\(c\\)\\s*(\\d{4})(?:-(\\d{4}))?\\s+(.+?)\\s+(\\S+@\\S+)`,
       "i",
     ),
-    // The indent is the one the generator writes names at, so a line reading
-    // `//  ported from libfoo, ask bugs@libfoo.org` stays a note. The address
-    // has to end the line, and the name runs up to the last run of whitespace
-    // before it, which is what lets a name carry spaces of its own.
+    // Where a contributor line sits is what tells it from a note, rather than
+    // how far it is indented: the generator writes them in one run between the
+    // copyright line and the licence line, and `parseHeader` only offers this
+    // pattern lines inside that run. An indent guess cannot do the same job.
+    // Too deep and a header written at a narrower name column loses every name
+    // in it; too shallow and a note two spaces in is read as a credit.
     //
-    // This is the loosest of the patterns and is therefore tried last.
-    contributor: new RegExp(
-      `^${prefix}\\s{${indent},}(.+?)\\s+(\\S+@\\S+)\\s*$`,
-    ),
+    // What is left for the pattern is that the line is indented at all and ends
+    // in an address, with the name running up to the last run of whitespace
+    // before it, which is what lets a name carry spaces of its own.
+    contributor: new RegExp(`^${prefix}\\s+(.+?)\\s+(\\S+@\\S+)\\s*$`),
     // The tag alone claims the line. Everything after it is a tail this pattern
     // does not read, because `licenceOf` reads it: an expression can be a single
     // identifier, or `MIT OR Apache-2.0`, or a parenthesised expression with
@@ -154,12 +148,31 @@ const DEFAULT_PREFIX = "//";
 /** Every separator character the tool has written, so old files keep reading. */
 const DEFAULT_SEPARATORS = "-=*";
 
-/** The column names are written at when nothing says otherwise. */
-const DEFAULT_NAME_COLUMN = 40;
-
 /** A literal, safe to drop into a pattern. */
 function quoted(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&");
+}
+
+/**
+ * How many lines the block at the top of `content` runs to, or nothing.
+ *
+ * A block is a run of lines between two separators, whatever is written inside
+ * it. That is a weaker question than `parseHeader` asks, and it is the one to
+ * ask before writing: a block this tool cannot read is still a block, and
+ * putting a fresh header above it leaves the file with two.
+ */
+export function headerExtent(
+  content: string,
+  config?: ResolvedConfig,
+): number | undefined {
+  const line = patterns(config);
+  const lines = content.split("\n");
+  if (lines.length === 0 || !line.separator.test(lines[0])) return undefined;
+
+  for (let i = 1; i < lines.length; i++) {
+    if (line.separator.test(lines[i])) return i + 1;
+  }
+  return undefined;
 }
 
 /**
@@ -188,6 +201,11 @@ export function parseHeader(
   let spdxLicense: string | null = null;
   let licenseUrl: string | null = null;
   let maintainerEmail: string | null = null;
+  /** Whether the scan is inside the run of names, which opens at the copyright
+   * line and closes at the licence line. Outside it a line ending in an address
+   * is somebody's note, and reading it as a credit is what pushes a real name
+   * past the limit and deletes it on the next repair. */
+  let crediting = false;
 
   // Scan for the closing separator
   for (let i = 1; i < lines.length; i++) {
@@ -208,6 +226,7 @@ export function parseHeader(
         name: copyrightMatch[3],
         email: copyrightMatch[4],
       });
+      crediting = true;
       continue;
     }
 
@@ -218,11 +237,12 @@ export function parseHeader(
       spdxLicense = read.licence;
       licenseUrl = read.url;
       maintainerEmail = read.email;
+      crediting = false;
       continue;
     }
 
     // Check for contributor continuation line
-    const contributorMatch = here.match(line.contributor);
+    const contributorMatch = crediting ? here.match(line.contributor) : null;
     if (contributorMatch) {
       contributors.push({
         name: contributorMatch[1],
@@ -470,6 +490,7 @@ export function replaceHeader(
   content: string,
   newHeader: string,
   existingHeader?: ParsedHeader,
+  config?: ResolvedConfig,
 ): string {
   // Handle shebang preservation
   const shebangResult = extractShebang(content);
@@ -480,11 +501,12 @@ export function replaceHeader(
       shebangResult.rest,
       newHeader,
       existingHeader,
+      config,
     );
     return shebangResult.shebang + "\n" + restWithHeader;
   }
 
-  return replaceHeaderInContent(content, newHeader, existingHeader);
+  return replaceHeaderInContent(content, newHeader, existingHeader, config);
 }
 
 /**
@@ -494,11 +516,16 @@ function replaceHeaderInContent(
   content: string,
   newHeader: string,
   existingHeader?: ParsedHeader,
+  config?: ResolvedConfig,
 ): string {
-  if (existingHeader) {
-    // Replace existing header
-    const lines = content.split("\n");
-    const afterHeader = lines.slice(existingHeader.endLine);
+  // A block this tool could not read is still a block, and it is replaced
+  // rather than written above. Otherwise a project whose old headers say
+  // something the patterns do not recognise gets a second one prepended to
+  // every file in it, on the run that was supposed to adopt the tool.
+  const ends = existingHeader?.endLine ?? headerExtent(content, config);
+
+  if (ends !== undefined) {
+    const afterHeader = content.split("\n").slice(ends);
 
     // Ensure blank line after header
     const separator = afterHeader[0]?.trim() === "" ? "" : "\n";

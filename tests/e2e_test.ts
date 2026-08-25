@@ -1051,4 +1051,35 @@ describe("fix repairs whatever the configuration decides", () => {
     assertEquals(separators(once).length, 2);
     assertEquals(await Deno.readTextFile(path), once);
   });
+
+  it("replaces a block it cannot read rather than writing above it", async () => {
+    // The block a project already has says whatever its own convention said,
+    // and this tool reads none of it: no year, no address, no tag it knows. A
+    // block is still a block, so the repair replaces it. Writing above it would
+    // leave a second header in every file in the tree, on the run meant to
+    // adopt the tool.
+    const path = join(env.rootDir, "adopted.ts");
+    const rule = `//${"-".repeat(98)}`;
+    await writeFile(
+      path,
+      [
+        rule,
+        "// Copyright Acme Corporation. All rights reserved.",
+        rule,
+        "",
+        "export const a = 1;",
+        "",
+      ]
+        .join("\n"),
+    );
+    await gitCommit(env.rootDir, "Add adopted.ts");
+
+    await captureOutput(() => cliMain(["fix"]));
+    const once = await Deno.readTextFile(path);
+    await captureOutput(() => cliMain(["fix"]));
+
+    assertEquals(separators(once).length, 2);
+    assertStringIncludes(once, "export const a = 1;");
+    assertEquals(await Deno.readTextFile(path), once);
+  });
 });

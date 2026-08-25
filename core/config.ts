@@ -68,6 +68,12 @@ const LICENSE_URLS: Record<string, string> = {
  */
 export function deriveLicenseUrl(spdx: string): string {
   if (!spdx) return "";
+  // A compound expression names no single page. `MIT OR Apache-2.0` has an
+  // entry for each half and none for the pair, so the guessed link would be a
+  // 404 with spaces in it, and a url with spaces in it is not a url: the header
+  // it lands in reads back as one long licence expression and then disagrees
+  // with the configuration it was written from, permanently.
+  if (!/^[A-Za-z0-9.+-]+$/.test(spdx)) return "";
   return LICENSE_URLS[spdx] ?? `https://spdx.org/licenses/${spdx}.html`;
 }
 

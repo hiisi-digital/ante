@@ -101,7 +101,7 @@ async function fixFile(
       const yearEnd = yearRange?.lastYear ?? currentYear;
 
       const header = generateHeader(config, contributors, yearStart, yearEnd);
-      const newContent = replaceHeader(content, header);
+      const newContent = replaceHeader(content, header, undefined, config);
 
       if (!dryRun) {
         await Deno.writeTextFile(path, newContent);
@@ -145,7 +145,7 @@ async function fixFile(
     }
 
     const updates = named(parsed, config, currentUser, currentYear);
-    const newContent = replaceHeader(content, updatedHeader, parsed);
+    const newContent = replaceHeader(content, updatedHeader, parsed, config);
 
     if (!dryRun) {
       await Deno.writeTextFile(path, newContent);

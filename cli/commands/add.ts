@@ -114,16 +114,16 @@ export async function add(options: AddOptions, config: ResolvedConfig): Promise<
         newContributor: currentUser,
         updateYear: currentYear,
       });
-      newContent = replaceHeader(content, updatedHeader, parsed);
+      newContent = replaceHeader(content, updatedHeader, parsed, config);
     } else {
       // Can't parse, just regenerate
       const header = generateHeader(config, contributors, yearStart, yearEnd);
-      newContent = replaceHeader(content, header);
+      newContent = replaceHeader(content, header, undefined, config);
     }
   } else {
     // No existing header - create new one
     const header = generateHeader(config, contributors, yearStart, yearEnd);
-    newContent = replaceHeader(content, header);
+    newContent = replaceHeader(content, header, undefined, config);
   }
 
   // Write the file
