@@ -21,7 +21,7 @@ import {
   rewriteHeader,
   updateHeader,
 } from "#core";
-import { findFilesRecursive } from "./_files.ts";
+import { filesToActOn } from "./_files.ts";
 
 /**
  * Options for the fix command.
@@ -183,11 +183,7 @@ export async function runFix(
   config: ResolvedConfig,
   options: FixOptions = {},
 ): Promise<FixResult[]> {
-  const includePatterns = options.glob ? [options.glob] : config.include;
-  const excludePatterns = config.exclude;
-
-  // Find all files to process
-  const files = await findFilesRecursive(".", includePatterns, excludePatterns);
+  const files = await filesToActOn(config, options.glob);
 
   if (options.verbose) {
     console.log(`Found ${files.length} file(s) to process`);

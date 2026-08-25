@@ -54,8 +54,8 @@ USAGE:
 
 COMMANDS:
   init              Set up configuration and install git hooks
-  check [glob]      Verify headers are present and valid
-  fix [glob]        Fix all headers to match configuration
+  check [path]      Verify headers are present and valid
+  fix [path]        Fix all headers to match configuration
   add <file>        Add header to a specific file
   help              Show this help message
   version           Show version information
@@ -71,6 +71,7 @@ OPTIONS:
 EXAMPLES:
   ante init                    # Set up ante in your project
   ante check                   # Check all files
+  ante check src               # Check one directory
   ante check "src/**/*.ts"     # Check specific files
   ante fix                     # Fix all headers
   ante add src/new-file.ts     # Add header to one file

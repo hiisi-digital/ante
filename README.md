@@ -64,6 +64,7 @@ declaration through as a line it does not model, or keep stamping over it.
 | Piece                            | What it is for                                                                              |
 | :------------------------------- | :------------------------------------------------------------------------------------------ |
 | `ante check`                     | Verifies headers and exits non-zero when any is wrong. The thing a hook or a pipeline runs. |
+| `ante check src`                 | The same over one directory. A run matching no file is an error, not a pass.                |
 | `ante fix`                       | Rewrites every header to match the configuration.                                           |
 | `ante add`                       | Puts a header on one named file.                                                            |
 | `ante init`                      | Writes a configuration and installs the git hooks.                                          |
@@ -131,6 +132,7 @@ Or as a dependency:
 ```bash
 ante init                  # Set up config and install git hooks
 ante check                 # Verify headers (exits non-zero if issues found)
+ante check src             # Check one directory
 ante check "src/**/*.ts"   # Check specific files
 ante fix                   # Fix all headers to match config
 ante add src/new-file.ts   # Add header to a specific file

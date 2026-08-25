@@ -13,7 +13,7 @@
 
 import type { ResolvedConfig } from "#core";
 import { hasValidHeader, validateHeader } from "#core";
-import { findFilesRecursive } from "./_files.ts";
+import { filesToActOn } from "./_files.ts";
 
 /**
  * Options for the check command.
@@ -51,17 +51,6 @@ interface CheckResult {
   failedFiles: number;
   /** Per-file results */
   files: FileCheckResult[];
-}
-
-/**
- * Expands glob patterns to file paths.
- */
-function expandGlobs(
-  patterns: string[],
-  excludePatterns: string[],
-): Promise<string[]> {
-  // Recursively search from current directory
-  return findFilesRecursive(".", patterns, excludePatterns);
 }
 
 /**
@@ -108,11 +97,7 @@ export async function runCheck(
   config: ResolvedConfig,
   options: CheckOptions = {},
 ): Promise<CheckResult> {
-  const includePatterns = options.glob ? [options.glob] : config.include;
-  const excludePatterns = config.exclude;
-
-  // Find all files to check
-  const files = await expandGlobs(includePatterns, excludePatterns);
+  const files = await filesToActOn(config, options.glob);
 
   if (options.verbose) {
     console.log(`Found ${files.length} file(s) to check`);
