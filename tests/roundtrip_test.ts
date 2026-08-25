@@ -21,6 +21,7 @@
 
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { describe, it } from "@std/testing/bdd";
+import { destroyed } from "./conservation.ts";
 import {
   type Contributor,
   deriveLicenseUrl,
@@ -31,7 +32,7 @@ import {
   rewriteHeader,
   updateHeader,
 } from "#core";
-import { DEFAULT_CONFIG } from "#core";
+import { CONFIG_BOUNDS, DEFAULT_CONFIG } from "#core";
 import type { ResolvedConfig } from "#core";
 
 /** A configuration built from the defaults with the swept fields replaced. */
@@ -46,24 +47,31 @@ function shaped(over: Partial<ResolvedConfig>): ResolvedConfig {
 }
 
 /**
- * The ends of every configurable range, from `schema/config.schema.json`.
+ * One configurable range, its ends taken from the generated bounds rather than
+ * transcribed here, so a change to the schema reaches the sweep.
  *
- * The sweep runs the extremes rather than a comfortable middle, because the
- * middle is where the round trip held for as long as nobody looked. A shape
- * outside these is not one a project can ask for, so it is not swept.
+ * The ends are what get swept, because the middle is where the round trip held
+ * for as long as nobody looked. A middle is listed only where the defaults sit
+ * near one, so the ordinary shape is covered alongside the corners.
  */
+function span(key: string, ...middles: number[]): readonly number[] {
+  const { min, max } = CONFIG_BOUNDS[key];
+  return [min, ...middles, max];
+}
+
+/** The ends of every configurable range. A shape outside one is not askable. */
 const BOUNDS = {
-  width: [60, 100, 200],
-  nameColumn: [20, 40, 100],
-  emailColumn: [40, 150],
-  licenseUrlColumn: [20, 100],
-  maintainerColumn: [50, 150],
-  maxContributors: [1, 3, 10],
+  width: span("width", 100),
+  nameColumn: span("nameColumn", 40),
+  emailColumn: span("emailColumn"),
+  licenseUrlColumn: span("licenseUrlColumn"),
+  maintainerColumn: span("maintainerColumn"),
+  maxContributors: span("maxContributors", 3),
 } as const;
 
 /** A column pulled back inside the range the schema permits. */
-function within(value: number, [low, high]: readonly [number, number]): number {
-  return Math.min(high, Math.max(low, value));
+function within(value: number, range: readonly number[]): number {
+  return Math.min(range[range.length - 1], Math.max(range[0], value));
 }
 
 /** Names either side of the width at which one overruns its column. */
@@ -342,47 +350,6 @@ describe("nothing in a header is destroyed by repairing it", () => {
     ];
   }
 
-  /** Every address in a line, which is what attribution comes down to. */
-  function addresses(line: string): string[] {
-    return line.match(/\S+@\S+/g) ?? [];
-  }
-
-  /**
-   * Every line of `before` whose content `after` no longer carries.
-   *
-   * A line survives if it is still there word for word, which is what happens
-   * to anything this tool does not model. A line it does model is rewritten
-   * into its own form, and what has to come through that is the attribution:
-   * every address the line carried is still somewhere in the header.
-   *
-   * The licence a line declared is deliberately not in this. A project's
-   * configured licence is what the tool writes, so a file declaring a different
-   * one has it replaced, and whether that is right for a vendored file is a
-   * question this property is not the place to settle.
-   */
-  function destroyed(
-    before: readonly string[],
-    after: string,
-    limit: number,
-  ): string[] {
-    // What the contributor limit deliberately drops is not counted here. It is
-    // the one deletion this tool makes on purpose, it is documented, and
-    // whether it should announce itself is `ante-silent-credit-drop` rather
-    // than a property this sweep can settle.
-    const dropped = new Set(
-      before.flatMap(addresses).slice(limit),
-    );
-
-    return before.filter((one) => {
-      if (one.trim() === "" || after.includes(one.trim())) return false;
-      const carried = addresses(one).filter((address) => !dropped.has(address));
-      if (addresses(one).length === 0) {
-        return !/SPDX-License-Identifier:/i.test(one);
-      }
-      return !carried.every((address) => after.includes(address));
-    });
-  }
-
   it("survives the run that adopts the tool, whatever the block said", () => {
     // The create path: no header this tool can read, so it writes one. What it
     // must not do is write it over the top of what was there.
@@ -392,7 +359,7 @@ describe("nothing in a header is destroyed by repairing it", () => {
       for (const { name, block } of corpus(config)) {
         const content = [...block, "", "export const a = 1;", ""].join("\n");
         const after = rewriteHeader(content, config, people(1), 2026, 2026);
-        for (const gone of destroyed(block, after, config.maxContributors)) {
+        for (const gone of destroyed(block, after, { limit: config.maxContributors })) {
           lost.push(`${label} / ${name}: ${gone}`);
         }
       }
@@ -414,7 +381,7 @@ describe("nothing in a header is destroyed by repairing it", () => {
         const second = read === null
           ? rewriteHeader(first, config, people(1), 2026, 2026)
           : replaceHeader(first, updateHeader(read, config, {}), read, config);
-        for (const gone of destroyed(block, second, config.maxContributors)) {
+        for (const gone of destroyed(block, second, { limit: config.maxContributors })) {
           lost.push(`${label} / ${name}: ${gone}`);
         }
       }

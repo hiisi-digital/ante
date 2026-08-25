@@ -176,12 +176,6 @@ export function headerExtent(
 }
 
 /**
- * Parses a copyright header from file content.
- *
- * @param content - The file content to parse
- * @returns The parsed header, or null if no valid header found
- */
-/**
  * What the block at the top of `content` says that this tool did not claim.
  *
  * Everything between the two separators, less the lines the patterns read as a
@@ -203,6 +197,12 @@ export function interiorOf(
   return content.split("\n").slice(1, ends - 1);
 }
 
+/**
+ * Parses a copyright header from file content.
+ *
+ * @param content - The file content to parse
+ * @returns The parsed header, or null if no valid header found
+ */
 export function parseHeader(
   content: string,
   config?: ResolvedConfig,
@@ -502,19 +502,6 @@ function extractShebang(content: string): { shebang: string; rest: string } | nu
 }
 
 /**
- * Replaces or prepends a header in file content.
- *
- * Handles special cases:
- * - Shebang lines (#!) are preserved at the very top of the file
- * - Existing headers are replaced in-place
- * - New headers are inserted after any shebang
- *
- * @param content - The original file content
- * @param newHeader - The new header to insert
- * @param existingHeader - The existing header to replace (if any)
- * @returns The updated file content
- */
-/**
  * A fresh header over whatever `content` already had at the top of it.
  *
  * The create path, as one function, because conservation is a property of the
@@ -554,6 +541,19 @@ export function rewriteHeader(
   return replaceHeader(content, header, undefined, config);
 }
 
+/**
+ * Replaces or prepends a header in file content.
+ *
+ * Handles special cases:
+ * - Shebang lines (#!) are preserved at the very top of the file
+ * - Existing headers are replaced in-place
+ * - New headers are inserted after any shebang
+ *
+ * @param content - The original file content
+ * @param newHeader - The new header to insert
+ * @param existingHeader - The existing header to replace (if any)
+ * @returns The updated file content
+ */
 export function replaceHeader(
   content: string,
   newHeader: string,
