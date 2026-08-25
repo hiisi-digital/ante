@@ -19,6 +19,7 @@ import {
 import { assertEquals } from "@std/assert";
 import { describe, it } from "@std/testing/bdd";
 import { DEFAULT_CONFIG } from "../core/config.generated.ts";
+import { CATALOGUED } from "./catalogued.ts";
 import { people } from "./conservation.ts";
 
 const SAMPLE_HEADER =
@@ -358,7 +359,7 @@ describe("a header written with no licence configured", () => {
 
   it({
     name: "does not certify a header whose licence is blank (ante-blank-licence-certified)",
-    ignore: true,
+    ignore: !CATALOGUED,
     fn(): void {
       // Catalogued rather than fixed. `validateHeader` skips the comparison
       // entirely when the configured licence is empty, so the same guard means

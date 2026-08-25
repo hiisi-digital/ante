@@ -47,11 +47,11 @@ export async function add(options: AddOptions, config: ResolvedConfig): Promise<
   try {
     const stat = await Deno.stat(file);
     if (!stat.isFile) {
-      console.error(`Error: ${file} is not a file`);
+      console.error(`${file} is not a file`);
       return 1;
     }
   } catch {
-    console.error(`Error: File not found: ${file}`);
+    console.error(`no file at ${file}`);
     return 1;
   }
 
@@ -82,7 +82,8 @@ export async function add(options: AddOptions, config: ResolvedConfig): Promise<
   const currentUser = await getCurrentGitUser();
   if (!currentUser) {
     console.error(
-      "Error: Could not determine git user. Please configure git user.name and user.email",
+      "no git user to credit. Set git user.name and user.email, or name the\n" +
+        "contributors in the config",
     );
     return 1;
   }

@@ -75,6 +75,7 @@
     "prepublish": "deno task all && deno task test:node",
     "codegen": "deno run --allow-read --allow-write scripts/codegen.ts",
     "build:npm": "deno run -A scripts/build-npm.ts",
+    "test:catalogued": "ANTE_CATALOGUED=1 deno test --allow-all --no-check",
     "test:node": "deno task build:npm && node tests/node/smoke.mjs && node tests/node/git.mjs && node tests/node/types.mjs"
   },
   "publish": {
