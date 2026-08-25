@@ -19,6 +19,7 @@ import {
   hasValidHeader,
   parseHeader,
   replaceHeader,
+  rewriteHeader,
   updateHeader,
 } from "#core";
 import { findFilesRecursive } from "./_files.ts";
@@ -100,8 +101,13 @@ async function fixFile(
       const yearStart = yearRange?.firstYear ?? currentYear;
       const yearEnd = yearRange?.lastYear ?? currentYear;
 
-      const header = generateHeader(config, contributors, yearStart, yearEnd);
-      const newContent = replaceHeader(content, header, undefined, config);
+      const newContent = rewriteHeader(
+        content,
+        config,
+        contributors,
+        yearStart,
+        yearEnd,
+      );
 
       if (!dryRun) {
         await Deno.writeTextFile(path, newContent);

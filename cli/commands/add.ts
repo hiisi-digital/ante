@@ -18,6 +18,7 @@ import {
   hasValidHeader,
   parseHeader,
   replaceHeader,
+  rewriteHeader,
   updateHeader,
 } from "#core";
 
@@ -116,14 +117,12 @@ export async function add(options: AddOptions, config: ResolvedConfig): Promise<
       });
       newContent = replaceHeader(content, updatedHeader, parsed, config);
     } else {
-      // Can't parse, just regenerate
-      const header = generateHeader(config, contributors, yearStart, yearEnd);
-      newContent = replaceHeader(content, header, undefined, config);
+      // Can't read it, so write a fresh one carrying whatever it said.
+      newContent = rewriteHeader(content, config, contributors, yearStart, yearEnd);
     }
   } else {
     // No existing header - create new one
-    const header = generateHeader(config, contributors, yearStart, yearEnd);
-    newContent = replaceHeader(content, header, undefined, config);
+    newContent = rewriteHeader(content, config, contributors, yearStart, yearEnd);
   }
 
   // Write the file

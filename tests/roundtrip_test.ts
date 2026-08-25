@@ -19,14 +19,16 @@
  * side of every boundary instead.
  */
 
-import { assertEquals } from "@std/assert";
+import { assertEquals, assertStringIncludes } from "@std/assert";
 import { describe, it } from "@std/testing/bdd";
 import {
   type Contributor,
   deriveLicenseUrl,
   generateHeader,
   parseHeader,
+  replaceHeader,
   resolveConfig,
+  rewriteHeader,
   updateHeader,
 } from "#core";
 import { DEFAULT_CONFIG } from "#core";
@@ -295,6 +297,133 @@ describe("a header carrying lines this tool does not model", () => {
   });
 });
 
+describe("nothing in a header is destroyed by repairing it", () => {
+  /** The blocks a project already has, rendered in one configuration's marks.
+   *
+   * None of these were written by this tool and most of them it cannot read.
+   * They are what is actually at the top of the files in a repository the day
+   * somebody adds ante to it, and the first run has to leave every one of them
+   * legible. A copyright notice and a licence pointer are what a project is
+   * obliged to carry, so losing one is worse than any misalignment. */
+  function corpus(config: ResolvedConfig): { name: string; block: string[] }[] {
+    const mark = config.commentPrefix;
+    const rule = mark + config.separatorChar.repeat(config.width - mark.length);
+    const wrap = (name: string, lines: string[]) => ({
+      name,
+      block: [rule, ...lines.map((one) => `${mark} ${one}`), rule],
+    });
+
+    return [
+      wrap("a corporate notice with no year", [
+        "Copyright (c) Acme Corporation  legal@acme.example",
+        "Licensed under the Acme Source Licence. See LICENCE-ACME for terms.",
+      ]),
+      wrap("a vendored third-party notice", [
+        "Copyright 2016-2019 The libfoo Authors. All rights reserved.",
+        "Use of this source code is governed by a BSD-style licence that can be",
+        "found in the LICENSE file at https://libfoo.example/LICENSE",
+      ]),
+      wrap("a decorative banner that is not a header at all", [
+        "renderer, hot path",
+        "do not reorder the fields below without reading the layout note",
+      ]),
+      wrap("a licence tag written first, which is the kernel's ordering", [
+        "SPDX-License-Identifier: MIT",
+        "Copyright (c) 2020-2026  Ada  ada@example.com",
+        "See NOTICE, or write to legal@example.com",
+      ]),
+      wrap("a notice with no licence line at all", [
+        "Copyright (c) 2020-2026  Ada  ada@example.com",
+        "See NOTICE, or write to legal@example.com",
+      ]),
+      wrap("a copyright line with no address", [
+        "Copyright (c) 2020 Ada Lovelace",
+      ]),
+    ];
+  }
+
+  /** Every address in a line, which is what attribution comes down to. */
+  function addresses(line: string): string[] {
+    return line.match(/\S+@\S+/g) ?? [];
+  }
+
+  /**
+   * Every line of `before` whose content `after` no longer carries.
+   *
+   * A line survives if it is still there word for word, which is what happens
+   * to anything this tool does not model. A line it does model is rewritten
+   * into its own form, and what has to come through that is the attribution:
+   * every address the line carried is still somewhere in the header.
+   *
+   * The licence a line declared is deliberately not in this. A project's
+   * configured licence is what the tool writes, so a file declaring a different
+   * one has it replaced, and whether that is right for a vendored file is a
+   * question this property is not the place to settle.
+   */
+  function destroyed(
+    before: readonly string[],
+    after: string,
+    limit: number,
+  ): string[] {
+    // What the contributor limit deliberately drops is not counted here. It is
+    // the one deletion this tool makes on purpose, it is documented, and
+    // whether it should announce itself is `ante-silent-credit-drop` rather
+    // than a property this sweep can settle.
+    const dropped = new Set(
+      before.flatMap(addresses).slice(limit),
+    );
+
+    return before.filter((one) => {
+      if (one.trim() === "" || after.includes(one.trim())) return false;
+      const carried = addresses(one).filter((address) => !dropped.has(address));
+      if (addresses(one).length === 0) {
+        return !/SPDX-License-Identifier:/i.test(one);
+      }
+      return !carried.every((address) => after.includes(address));
+    });
+  }
+
+  it("survives the run that adopts the tool, whatever the block said", () => {
+    // The create path: no header this tool can read, so it writes one. What it
+    // must not do is write it over the top of what was there.
+    const lost: string[] = [];
+
+    for (const { label, config } of shapes()) {
+      for (const { name, block } of corpus(config)) {
+        const content = [...block, "", "export const a = 1;", ""].join("\n");
+        const after = rewriteHeader(content, config, people(1), 2026, 2026);
+        for (const gone of destroyed(block, after, config.maxContributors)) {
+          lost.push(`${label} / ${name}: ${gone}`);
+        }
+      }
+    }
+
+    assertEquals(lost.slice(0, 4), [], JSON.stringify(lost.slice(0, 4), null, 1));
+  });
+
+  it("survives every later repair too, and settles", () => {
+    // And the repair path, run twice, because a line that survives once and is
+    // dropped on the second run is the same loss one commit later.
+    const lost: string[] = [];
+
+    for (const { label, config } of shapes()) {
+      for (const { name, block } of corpus(config)) {
+        const content = [...block, "", "export const a = 1;", ""].join("\n");
+        const first = rewriteHeader(content, config, people(1), 2026, 2026);
+        const read = parseHeader(first, config);
+        const second = read === null
+          ? rewriteHeader(first, config, people(1), 2026, 2026)
+          : replaceHeader(first, updateHeader(read, config, {}), read, config);
+        for (const gone of destroyed(block, second, config.maxContributors)) {
+          lost.push(`${label} / ${name}: ${gone}`);
+        }
+      }
+    }
+
+    assertEquals(lost.slice(0, 4), [], JSON.stringify(lost.slice(0, 4), null, 1));
+  });
+});
+
 describe("a line in the header this tool did not write", () => {
   /** A header with one line spliced in at `at`, counted from the top. */
   function spliced(
@@ -367,14 +496,29 @@ describe("a line in the header this tool did not write", () => {
     assertEquals(kept.has(who[2].email), false);
   });
 
-  it("does not cost one to a line in the run that starts at the prefix", () => {
+  it("ends the run at a line that is not a credit, and loses nobody doing it", () => {
+    // The run has to end somewhere other than the closing separator, because a
+    // header whose licence tag comes first, which is the kernel's ordering,
+    // would otherwise leave it open and read a note several lines down as
+    // somebody's name. So the first line inside it that is not a credit ends
+    // it.
+    //
+    // What that costs is here: the names below such a line stop being credits
+    // and become lines the tool carries instead. They are all still in the
+    // file, nobody is deleted, and the alignment is what suffers. That is the
+    // better half of the trade, because a false credit can push a real one past
+    // the limit and a demoted one cannot.
     const config = shaped({ maxContributors: 3 });
     const who = people(3);
     const note = "//Formerly maintained by old@example.com";
-    const kept = survivors(config, note, who, 2);
+    const read = parseHeader(spliced(config, note, who, 2), config);
 
-    assertEquals(kept.has("old@example.com"), false);
-    for (const one of who) assertEquals(kept.has(one.email), true);
+    assertEquals(read?.contributors.map((one) => one.email), [who[0].email]);
+    assertEquals(read?.extra.length, 3);
+
+    const repaired = updateHeader(read!, config, {});
+    for (const one of who) assertStringIncludes(repaired, one.email);
+    assertStringIncludes(repaired, "old@example.com");
   });
 
   it("holds the contributor limit on the path a repair takes", () => {

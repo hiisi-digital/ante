@@ -181,6 +181,28 @@ export function headerExtent(
  * @param content - The file content to parse
  * @returns The parsed header, or null if no valid header found
  */
+/**
+ * What the block at the top of `content` says that this tool did not claim.
+ *
+ * Everything between the two separators, less the lines the patterns read as a
+ * copyright, a credit or a licence. For a block written by somebody else's
+ * convention that is all of it, which is the point: a notice and a licence
+ * pointer are what a project is obliged to carry, and the run that adopts this
+ * tool has to leave every line of them legible.
+ */
+export function interiorOf(
+  content: string,
+  config?: ResolvedConfig,
+): string[] {
+  const ends = headerExtent(content, config);
+  if (ends === undefined) return [];
+
+  const read = parseHeader(content, config);
+  if (read !== null) return read.extra;
+
+  return content.split("\n").slice(1, ends - 1);
+}
+
 export function parseHeader(
   content: string,
   config?: ResolvedConfig,
@@ -250,6 +272,12 @@ export function parseHeader(
       });
       continue;
     }
+
+    // The run of names is contiguous, so the first line inside it that is not a
+    // credit ends it. Otherwise a header whose licence tag comes first, which is
+    // the kernel's ordering and what `reuse` writes, leaves the run open to the
+    // closing separator and reads a note six lines down as somebody's name.
+    crediting = false;
 
     // Nothing here recognises it, so keep it rather than lose it.
     extra.push(here);
@@ -486,6 +514,46 @@ function extractShebang(content: string): { shebang: string; rest: string } | nu
  * @param existingHeader - The existing header to replace (if any)
  * @returns The updated file content
  */
+/**
+ * A fresh header over whatever `content` already had at the top of it.
+ *
+ * The create path, as one function, because conservation is a property of the
+ * whole of it rather than of either half: generating a header and replacing a
+ * block are both correct on their own while the pair of them silently drops
+ * what the block said. What it said travels as `extra`, so the block is
+ * replaced and its lines are still there to read.
+ */
+export function rewriteHeader(
+  content: string,
+  config: ResolvedConfig,
+  contributors: Contributor[],
+  yearStart: number,
+  yearEnd: number,
+): string {
+  // Anybody the old block credited comes first, because they were there first.
+  // Reading them costs nothing here and dropping them is the loss this whole
+  // function exists to prevent: the block is being replaced, so a name only it
+  // carried has nowhere else to be.
+  const already = parseHeader(content, config)?.contributors ?? [];
+  const seen = new Set<string>();
+  const both: Contributor[] = [];
+  for (const one of [...already, ...contributors]) {
+    const key = one.email.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    both.push(one);
+  }
+
+  const header = generateHeader(
+    config,
+    both,
+    yearStart,
+    yearEnd,
+    interiorOf(content, config),
+  );
+  return replaceHeader(content, header, undefined, config);
+}
+
 export function replaceHeader(
   content: string,
   newHeader: string,
