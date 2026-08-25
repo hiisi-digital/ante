@@ -488,6 +488,26 @@ describe("a line in the header this tool did not write", () => {
     assertStringIncludes(repaired, "old@example.com");
   });
 
+  it("says a demoted name once when they come back, not twice", () => {
+    // The people a short run demotes are the people who work on the file, so
+    // they commit again, and the repair that adds them back as a credit would
+    // leave their carried line sitting under the licence saying the same thing.
+    // Credited wins and the carried line goes, because credited is the form the
+    // tool can read back.
+    const config = shaped({ maxContributors: 3 });
+    const who = people(3);
+    const note = "//Formerly maintained by old@example.com";
+
+    let content = spliced(config, note, who, 2);
+    for (let round = 0; round < 3; round++) {
+      content = rewriteHeader(content, config, [who[2]], 2020, 2026);
+    }
+
+    const times = content.split("\n").filter((one) => one.includes(who[2].email));
+    assertEquals(times.length, 1);
+    assertStringIncludes(content, "old@example.com");
+  });
+
   it("holds the contributor limit on the path a repair takes", () => {
     // `generateHeader` applies the limit and is tested where it is declared.
     // What matters here is the path the tool actually walks on a file that

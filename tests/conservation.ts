@@ -26,11 +26,14 @@ export interface Allowance {
   /** The comment prefix to take off a line before comparing it. */
   prefix?: string;
   /**
-   * Whether a copyright line is exempt. It is a field the tool owns and
-   * rewrites, so a vendored file's own years going is the tool doing what it
-   * was asked rather than losing something.
+   * The licence the project configured.
+   *
+   * A file declaring that licence has its declaration rewritten by the tool,
+   * which is the tool doing what it was asked. A file declaring a different one
+   * is somebody else's, and replacing its declaration is a statement about
+   * their code rather than ours, so that line is counted.
    */
-  rewritesCopyright?: boolean;
+  licence?: string;
 }
 
 /**
@@ -58,13 +61,23 @@ export function destroyed(
     ? undefined
     : new RegExp(`^${how.prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s?`);
 
+  // Whole lines, not substrings. A deleted line whose text happens to sit
+  // inside a longer one that stayed reads as surviving under containment, and
+  // an instrument that can report a false green is worse than none.
+  const standing = new Set(
+    after.split("\n").map((one) => (bare === undefined ? one : one.replace(bare, "")).trim()),
+  );
+
   return before.filter((one) => {
     const text = (bare === undefined ? one : one.replace(bare, "")).trim();
-    if (text === "" || after.includes(text)) return false;
+    if (text === "" || standing.has(text)) return false;
+
     // Unanchored, because a caller that does not name a prefix hands these in
     // with the comment marker still on the front.
-    if (/SPDX-License-Identifier:/i.test(text)) return false;
-    if (how.rewritesCopyright && /\bCopyright\b/i.test(text)) return false;
+    const declared = text.match(/SPDX-License-Identifier:\s*(\S+)/i);
+    if (declared !== null) {
+      return how.licence !== undefined && declared[1] !== how.licence;
+    }
 
     const links = addresses(one);
     if (links.length === 0) return true;

@@ -531,13 +531,20 @@ export function rewriteHeader(
     both.push(one);
   }
 
-  const header = generateHeader(
-    config,
-    both,
-    yearStart,
-    yearEnd,
-    interiorOf(content, config),
-  );
+  // A carried line whose addresses are all credited now would say the same
+  // people twice, once in the run of names and once below the licence. That
+  // happens to exactly the people who work on the file: a name demoted when the
+  // run ended early comes back as a credit the next time they commit, and its
+  // old line is still sitting there. Credited wins, because it is the form the
+  // tool can read back.
+  const credited = new Set(both.map((one) => one.email.toLowerCase()));
+  const carried = interiorOf(content, config).filter((line) => {
+    const found = line.match(/\S+@\S+/g);
+    if (found === null) return true;
+    return !found.every((one) => credited.has(one.toLowerCase()));
+  });
+
+  const header = generateHeader(config, both, yearStart, yearEnd, carried);
   return replaceHeader(content, header, undefined, config);
 }
 
