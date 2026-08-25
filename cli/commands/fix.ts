@@ -21,6 +21,7 @@ import {
   replaceHeader,
   rewriteHeader,
   updateHeader,
+  withoutStackedHeaders,
 } from "#core";
 import { filesToActOn } from "./_files.ts";
 
@@ -29,7 +30,8 @@ import { filesToActOn } from "./_files.ts";
  */
 interface FixOptions {
   /** Glob pattern to match files (overrides config.include) */
-  glob?: string;
+  /** The positionals, each a path, a directory or a glob. */
+  glob?: string | readonly string[];
   /** Dry run - show what would be fixed without making changes */
   dryRun?: boolean;
   /** Verbose output */
@@ -89,8 +91,15 @@ async function fixFile(
   dryRun: boolean,
 ): Promise<FixResult> {
   try {
-    const content = await Deno.readTextFile(path);
+    const onDisk = await Deno.readTextFile(path);
     const currentYear = new Date().getFullYear();
+
+    // A file this tool wrote to more than once carries a stack of header blocks,
+    // and only the first was ever read again. `check` reports the stack, so `fix`
+    // has to be able to clear it: a repair command that leaves a file its own
+    // check rejects is the disagreement this whole release is about.
+    const content = withoutStackedHeaders(onDisk, config);
+    const collapsed = content !== onDisk;
 
     if (!hasValidHeader(content, config)) {
       // No header - create one
@@ -161,7 +170,7 @@ async function fixFile(
       );
     }
 
-    if (updatedHeader === parsed.raw) {
+    if (updatedHeader === parsed.raw && !collapsed) {
       return {
         file: path,
         modified: false,
@@ -170,6 +179,7 @@ async function fixFile(
     }
 
     const updates = named(parsed, config, currentUser, currentYear);
+    if (collapsed) updates.unshift("Removed a duplicate header block");
     const newContent = replaceHeader(content, updatedHeader, parsed, config);
 
     if (!dryRun) {

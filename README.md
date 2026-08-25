@@ -276,21 +276,23 @@ and both calls answer with that rather than failing.
 
 ## Git hooks
 
-The `init` command installs a pre-commit hook that:
-
-1. Checks staged `.ts` files for copyright headers
-2. Creates headers for files that don't have one
-3. Adds the current git user as a contributor if not already present
-4. Updates year ranges when files are modified in a new year
-5. Stages the changes automatically
+The `init` command installs a pre-commit hook. It runs `ante fix` over the staged
+files and stages whatever changed, so it does the same thing the command does and
+the config decides which files it touches.
 
 ```bash
 ante init
 ```
 
+The hook needs `ante`, `deno` or `npx` on the path, and it looks for them in that
+order. With none of them it says so and lets the commit through, which means it
+can be installed and sit there doing nothing on a machine that has none.
+
 This writes hook scripts to `.githooks/` and configures git to use them. `init`
-also installs a commit-msg hook that rejects commit messages not in Conventional
-Commits format (`type: subject`).
+also installs a commit-msg hook that rejects anything not in Conventional Commits
+form: a type, an optional scope, an optional `!` for a breaking change, then a
+subject of up to 72 characters. Git's own merge, revert and fixup wording goes
+through untouched.
 
 ## Years
 

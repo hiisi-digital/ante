@@ -190,7 +190,7 @@ export async function main(args: string[]): Promise<number> {
     case "check": {
       try {
         const result = await runCheck(config, {
-          glob: parsed.args[0] ?? parsed.flags.glob,
+          glob: parsed.args.length > 0 ? parsed.args : parsed.flags.glob,
           verbose: parsed.flags.verbose,
           format: parsed.flags.format ?? "human",
         });
@@ -204,7 +204,7 @@ export async function main(args: string[]): Promise<number> {
     case "fix": {
       try {
         const results = await runFix(config, {
-          glob: parsed.args[0] ?? parsed.flags.glob,
+          glob: parsed.args.length > 0 ? parsed.args : parsed.flags.glob,
           dryRun: parsed.flags.dryRun,
           verbose: parsed.flags.verbose,
         });

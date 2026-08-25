@@ -15,8 +15,9 @@ import {
   stackedHeaders,
   updateHeader,
   validateHeader,
+  withoutStackedHeaders,
 } from "#core";
-import { assertEquals } from "@std/assert";
+import { assertEquals, assertStringIncludes } from "@std/assert";
 import { describe, it } from "@std/testing/bdd";
 import { DEFAULT_CONFIG } from "../core/config.generated.ts";
 import { CATALOGUED } from "./catalogued.ts";
@@ -502,5 +503,54 @@ describe("the names a header will not carry", () => {
         );
       }
     }
+  });
+});
+
+describe("collapsing a stack of header blocks", () => {
+  const block = [
+    "//" + "-".repeat(98),
+    "// Copyright (c) 2026                   orgrinrt                 ort@hiisi.digital",
+    "// SPDX-License-Identifier: MPL-2.0     https://mozilla.org/MPL/2.0        ort@hiisi.digital",
+    "//" + "-".repeat(98),
+  ].join("\n");
+  const body = "\nexport const x = 1;\n";
+
+  it("leaves alone what has one block or none", () => {
+    const one = block + "\n" + body;
+    assertEquals(withoutStackedHeaders(one, DEFAULT_CONFIG), one);
+    assertEquals(withoutStackedHeaders(body, DEFAULT_CONFIG), body);
+  });
+
+  it("takes a stack down to one, at any depth and with or without blank lines", () => {
+    for (const gap of ["\n", "\n\n", "\n\n\n"]) {
+      for (const depth of [2, 3, 5]) {
+        const stacked = Array(depth).fill(block).join(gap) + "\n" + body;
+        const flat = withoutStackedHeaders(stacked, DEFAULT_CONFIG);
+
+        assertEquals(
+          stackedHeaders(flat, DEFAULT_CONFIG),
+          1,
+          `depth=${depth} gap=${JSON.stringify(gap)} did not come down to one`,
+        );
+        assertEquals(
+          validateHeader(flat, DEFAULT_CONFIG).valid,
+          true,
+          "and what fix leaves has to be what check accepts",
+        );
+        // The body survives, which is the thing a collapse could quietly eat.
+        assertStringIncludes(flat, "export const x = 1;");
+      }
+    }
+  });
+
+  it("keeps a block further down the file, which is somebody else's", () => {
+    const mine = block + "\n\n" + block + "\n\nconst a = 1;\n\n" + block + "\n";
+    const flat = withoutStackedHeaders(mine, DEFAULT_CONFIG);
+    assertEquals(stackedHeaders(flat, DEFAULT_CONFIG), 1);
+    assertEquals(
+      flat.split("\n").filter((l) => /^\/\/-+$/.test(l)).length,
+      4,
+      "the one at the top collapsed to a single block, and the one below stayed",
+    );
   });
 });

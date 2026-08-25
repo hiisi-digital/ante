@@ -20,7 +20,8 @@ import { filesToActOn } from "./_files.ts";
  */
 interface CheckOptions {
   /** Glob pattern to filter files (overrides config.include) */
-  glob?: string;
+  /** The positionals, each a path, a directory or a glob. */
+  glob?: string | readonly string[];
   /** Show verbose output */
   verbose?: boolean;
   /** Output format: "human" for readable, "json" for machine-parseable */

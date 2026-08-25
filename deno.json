@@ -114,7 +114,8 @@
     "maxContributors": 3,
     "contributorSelection": "commits",
     "spdxLicense": "MPL-2.0",
-    "licenseUrl": "https://mozilla.org/MPL/2.0"
+    "licenseUrl": "https://mozilla.org/MPL/2.0",
+    "exclude": ["npm/**", "coverage/**", "docs/**"]
   },
   "minimumDependencyAge": 0
 }

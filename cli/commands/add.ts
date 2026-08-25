@@ -61,7 +61,7 @@ export async function add(options: AddOptions, config: ResolvedConfig): Promise<
     content = await Deno.readTextFile(file);
   } catch (error) {
     console.error(
-      `Error reading file: ${error instanceof Error ? error.message : error}`,
+      `could not read the file: ${error instanceof Error ? error.message : error}`,
     );
     return 1;
   }
@@ -136,7 +136,7 @@ export async function add(options: AddOptions, config: ResolvedConfig): Promise<
     return 0;
   } catch (error) {
     console.error(
-      `Error writing file: ${error instanceof Error ? error.message : error}`,
+      `could not write the file: ${error instanceof Error ? error.message : error}`,
     );
     return 1;
   }

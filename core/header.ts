@@ -496,6 +496,45 @@ export function stackedHeaders(
 }
 
 /**
+ * The content with any header blocks beyond the first removed.
+ *
+ * Unchanged where there is one block or none, which is nearly always.
+ *
+ * The first is kept because it is the one `parseHeader` reads and the one every
+ * other operation has been acting on, and because a stack is built by prepending,
+ * so the first is the newest. What the extra blocks hold is not merged in: they
+ * are duplicates of the survivor in every case observed, and merging would be
+ * inventing a policy for a shape that should not exist.
+ *
+ * @param content - The file content to collapse
+ * @param config - The resolved configuration
+ * @returns The content with one header block, or exactly what came in
+ */
+export function withoutStackedHeaders(
+  content: string,
+  config?: ResolvedConfig,
+): string {
+  if (stackedHeaders(content, config) < 2) return content;
+
+  const line = patterns(config);
+  const lines = content.split("\n");
+  const first = parseHeader(content, config);
+  if (first === null) return content;
+
+  let at = first.endLine;
+  while (true) {
+    let next = at;
+    while (next < lines.length && lines[next].trim() === "") next++;
+    if (next >= lines.length || !line.separator.test(lines[next])) break;
+    const parsed = parseHeader(lines.slice(next).join("\n"), config);
+    if (parsed === null) break;
+    at = next + parsed.endLine;
+  }
+
+  return [...lines.slice(0, first.endLine), ...lines.slice(at)].join("\n");
+}
+
+/**
  * Validates a header against the configuration.
  *
  * @param content - The file content to validate

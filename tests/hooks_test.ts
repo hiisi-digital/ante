@@ -58,7 +58,9 @@ async function ran(
  * exercises its own first branch (`command -v ante`) without needing anything
  * published. What is under test is the hook, not how ante got there.
  */
-async function aRepo(): Promise<{ dir: string; env: Record<string, string> }> {
+async function aRepo(
+  install = true,
+): Promise<{ dir: string; env: Record<string, string> }> {
   const dir = await Deno.makeTempDir({ prefix: "ante_hook_" });
   await ran("git", ["init", "-q"], dir);
   await ran("git", ["config", "user.name", "Hook Test"], dir);
@@ -87,7 +89,7 @@ async function aRepo(): Promise<{ dir: string; env: Record<string, string> }> {
       "",
     ].join("\n"),
   );
-  await installHook(dir);
+  if (install) await installHook(dir);
 
   return {
     dir,
@@ -156,6 +158,44 @@ describe("the pre-commit hook", () => {
     );
   });
 
+  it("headers every staged file, not the first one", async () => {
+    // The case none of the others reach, because each of them stages exactly
+    // one file. `ante fix` took one positional and dropped the rest, so a commit
+    // touching three files headered one and reported success, and a suite that
+    // only ever stages one cannot see it.
+    const { dir, env } = await aRepo();
+    const names = ["one.ts", "two.ts", "three.ts"];
+    await Promise.all(
+      names.map((n) => Deno.writeTextFile(join(dir, n), `export const x = 1;\n`)),
+    );
+    await ran("git", ["add", ...names], dir);
+    await ran("git", ["commit", "-q", "-m", "feat: three at once"], dir, env);
+
+    const inCommit = await Promise.all(
+      names.map((n) => ran("git", ["show", `HEAD:${n}`], dir)),
+    );
+    assertEquals(
+      names.filter((_, at) => !inCommit[at].out.includes("Copyright (c)")),
+      [],
+      "these were staged in the same commit and went in without a header",
+    );
+  });
+
+  it("handles a staged path with a space in it", async () => {
+    const { dir, env } = await aRepo();
+    const name = "a file.ts";
+    await Deno.writeTextFile(join(dir, name), "export const x = 1;\n");
+    await ran("git", ["add", name], dir);
+    await ran("git", ["commit", "-q", "-m", "feat: spaced"], dir, env);
+
+    const inCommit = await ran("git", ["show", `HEAD:${name}`], dir);
+    assertStringIncludes(
+      inCommit.out,
+      "Copyright (c)",
+      "a path with a space was split into two arguments",
+    );
+  });
+
   it("runs a second time without stacking a second header", async () => {
     const { dir, env } = await aRepo();
     await Deno.writeTextFile(join(dir, "b.ts"), "export const b = 1;\n");
@@ -186,6 +226,33 @@ describe("the pre-commit hook", () => {
       HOME: Deno.env.get("HOME") ?? "",
     });
     assertEquals(committed.code, 0, `the commit was blocked:\n${committed.out}`);
+  });
+});
+
+describe("installing into a subdirectory of a repository", () => {
+  it("points git at hooks it can actually resolve", async () => {
+    // `core.hooksPath` is resolved from the worktree root, not from wherever it
+    // was configured, so a bare `.githooks` written from `packages/foo` names a
+    // directory at the top that does not exist. Git then runs no hook and says
+    // nothing, which is worse than the wrong hook: there is no output to notice.
+    // No hooks at the root, or the root's own working `.githooks` would answer
+    // for the subdirectory's broken one and the case would pass either way.
+    const { dir, env } = await aRepo(false);
+    const inner = join(dir, "packages", "foo");
+    await Deno.mkdir(inner, { recursive: true });
+    await Deno.copyFile(join(dir, "ante.toml"), join(inner, "ante.toml"));
+    await installHook(inner);
+
+    await Deno.writeTextFile(join(inner, "deep.ts"), "export const d = 1;\n");
+    await ran("git", ["add", "packages/foo/deep.ts"], dir);
+    await ran("git", ["commit", "-q", "-m", "feat: deep"], dir, env);
+
+    const inCommit = await ran("git", ["show", "HEAD:packages/foo/deep.ts"], dir);
+    assertStringIncludes(
+      inCommit.out,
+      "Copyright (c)",
+      "the hook installed into a subdirectory never ran",
+    );
   });
 });
 

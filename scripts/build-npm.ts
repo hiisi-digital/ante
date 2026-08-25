@@ -133,14 +133,18 @@ try {
       const pkgJson = JSON.parse(Deno.readTextFileSync(pkgJsonPath));
 
       // Add exports field for proper ESM resolution
+      // `types` first, because export conditions are matched in order and
+      // typescript takes the first that applies. Behind `import` it is reached
+      // only through the fallback to a sibling `.d.ts`, which is the same thing
+      // that hid these paths naming a directory the build does not emit.
       pkgJson.exports = {
         ".": {
-          import: "./esm/mod.js",
           types: "./esm/mod.d.ts",
+          import: "./esm/mod.js",
         },
         "./cli": {
-          import: "./esm/cli/mod.js",
           types: "./esm/cli/mod.d.ts",
+          import: "./esm/cli/mod.js",
         },
       };
 
