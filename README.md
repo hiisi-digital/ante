@@ -36,10 +36,14 @@ standalone `ante.toml`, whichever the project already has.
 Under active development, so the api hasn't settled and breaking changes should
 be expected. We'll do our best to document migrations where they're needed.
 
-Two things to know about 0.2.3. A field that overruns its column keeps two
+Three things to know about 0.2.3. A field that overruns its column keeps two
 spaces after it rather than one, so the first `fix` after upgrading reformats
-existing headers once and then holds still. And `ParsedHeader` carries a new
-`extra` field, which is a break for anything constructing one by hand.
+existing headers once and then holds still. `ParsedHeader` carries a new `extra`
+field, which is a break for anything constructing one by hand. And a header block
+written to somebody else's convention is now kept: whatever `ante` cannot model
+in it comes through the rewrite verbatim, where earlier versions replaced the
+whole block. If a tree has been through an older `fix`, its third-party notices
+are worth a look before this one runs.
 
 ## Contents
 
@@ -52,6 +56,7 @@ existing headers once and then holds still. And `ParsedHeader` carries a new
 | `loadConfig` / `resolveConfig`   | Reads the configuration from whichever manifest holds it, and fills in what is derivable.   |
 | `generateHeader`                 | Builds a header from a configuration, a contributor list and a year.                        |
 | `parseHeader` / `hasValidHeader` | Reads a header back out of a file, and answers whether one is there and correct.            |
+| `rewriteHeader`                  | Writes a header over whatever was at the top, keeping every line it does not model.         |
 
 ## Installation
 
@@ -77,12 +82,10 @@ npx ante-cli <command>
 bunx ante-cli <command>
 ```
 
-The `./cli` entry point arrives with 0.2.3. Until that is out, the deno lines
-above resolve against 0.2.2, which exports the library and not the command, and
-they fail. npm is further behind at 0.1.7, so a node or bun install today gets an
-older build than this page describes. Both catch up at the next release. The name
-is pinned with `--name` because deno takes `cli` for a generic file stem and
-would otherwise fall back to the directory it came from.
+The `./cli` entry point is there as of 0.2.3, on both registries, so all six
+lines above work. The name is pinned with `--name` because deno reads `cli` as a
+generic file stem and would otherwise call the command after the directory it
+came from.
 
 As a library, `jsr:@hiisi/ante` on deno and `ante-cli` on node, both exporting
 the same names:
@@ -104,7 +107,7 @@ Or as a dependency:
 // package.json
 {
   "devDependencies": {
-    "ante-cli": "^0.1"
+    "ante-cli": "^0.2"
   }
 }
 ```
