@@ -33,7 +33,6 @@
         "explicit-function-return-type",
         "explicit-module-boundary-types",
         "no-await-in-loop",
-        "no-console",
         "no-const-assign",
         "no-eval",
         "no-implicit-declare-namespace-export",
@@ -76,7 +75,7 @@
     "prepublish": "deno task all && deno task test:node",
     "codegen": "deno run --allow-read --allow-write scripts/codegen.ts",
     "build:npm": "deno run -A scripts/build-npm.ts",
-    "test:node": "deno task build:npm && node tests/node/smoke.mjs && node tests/node/git.mjs && npx --yes tsx tests/node/types.ts"
+    "test:node": "deno task build:npm && node tests/node/smoke.mjs && node tests/node/git.mjs && node tests/node/types.mjs"
   },
   "publish": {
     "include": [

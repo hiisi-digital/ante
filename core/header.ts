@@ -436,6 +436,66 @@ export function hasValidHeader(
 }
 
 /**
+ * The contributors a header will not carry, because the limit is lower than the
+ * number of them.
+ *
+ * `generateHeader` slices to `maxContributors` and says nothing, so a name goes
+ * out of a file with no record anywhere that it was ever there. The limit is
+ * wanted and the silence is not: a caller that asks first can say whose credit
+ * it is about to drop.
+ *
+ * Order is the caller's. Whatever ranked them decided who is kept, and this
+ * reports the tail of that same ranking.
+ *
+ * @param contributors - The contributors in the order they would be written
+ * @param config - The resolved configuration
+ * @returns Those past the limit, in the order they were given, or none
+ */
+export function omittedContributors(
+  contributors: readonly Contributor[],
+  config: ResolvedConfig,
+): Contributor[] {
+  return contributors.slice(config.maxContributors);
+}
+
+/**
+ * How many header blocks sit at the top of a file, back to back.
+ *
+ * One is the ordinary answer and zero means there is no header. Anything above
+ * one is a file that has been written to more than once by something that could
+ * not see what was already there, and it is the shape `ante` itself shipped in
+ * for two versions: `gate.ts` carried two identical blocks and `check` passed it,
+ * because parsing stops at the first closing separator and everything below is
+ * just content.
+ *
+ * Only the run at the top counts. A notice further down the file belongs to
+ * whoever put it there.
+ *
+ * @param content - The file content to count blocks in
+ * @param config - The resolved configuration
+ * @returns The number of header blocks stacked at the top
+ */
+export function stackedHeaders(
+  content: string,
+  config?: ResolvedConfig,
+): number {
+  const line = patterns(config);
+  let lines = content.split("\n");
+  let found = 0;
+
+  while (true) {
+    const parsed = parseHeader(lines.join("\n"), config);
+    if (parsed === null) return found;
+    found++;
+    lines = lines.slice(parsed.endLine);
+    // A blank line between two blocks is what `fix` leaves behind, so the run
+    // continues across them rather than stopping at the first one.
+    while (lines.length > 0 && lines[0].trim() === "") lines = lines.slice(1);
+    if (lines.length === 0 || !line.separator.test(lines[0])) return found;
+  }
+}
+
+/**
  * Validates a header against the configuration.
  *
  * @param content - The file content to validate
@@ -452,6 +512,14 @@ export function validateHeader(
 
   if (!parsed) {
     return { valid: false, issues: ["No valid header found"] };
+  }
+
+  const stacked = stackedHeaders(content, config);
+  if (stacked > 1) {
+    issues.push(
+      `${stacked} header blocks are stacked at the top of the file; ` +
+        `only the first is read, and the rest are content`,
+    );
   }
 
   // Check year is valid

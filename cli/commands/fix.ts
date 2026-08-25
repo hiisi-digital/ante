@@ -16,6 +16,7 @@ import {
   getCurrentGitUser,
   getFileYearRange,
   hasValidHeader,
+  omittedContributors,
   parseHeader,
   replaceHeader,
   rewriteHeader,
@@ -140,6 +141,25 @@ async function fixFile(
       newContributor: currentUser ?? undefined,
       updateYear: currentYear,
     });
+
+    // Whose credit this is about to leave out. The limit is deliberate and the
+    // silence was not: a name went out of a file with nothing anywhere saying it
+    // had been there.
+    const willing = [...parsed.contributors];
+    if (
+      currentUser &&
+      !willing.some((c) => c.email.toLowerCase() === currentUser.email.toLowerCase())
+    ) {
+      willing.push(currentUser);
+    }
+    const omitted = omittedContributors(willing, config);
+
+    if (omitted.length > 0) {
+      console.log(
+        `  ${path}: ${omitted.length} past the limit of ${config.maxContributors}, ` +
+          `not in the header: ${omitted.map((c) => c.name).join(", ")}`,
+      );
+    }
 
     if (updatedHeader === parsed.raw) {
       return {

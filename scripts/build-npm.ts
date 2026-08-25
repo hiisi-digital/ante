@@ -136,18 +136,29 @@ try {
       pkgJson.exports = {
         ".": {
           import: "./esm/mod.js",
-          types: "./types/mod.d.ts",
+          types: "./esm/mod.d.ts",
         },
         "./cli": {
           import: "./esm/cli/mod.js",
-          types: "./types/cli/mod.d.ts",
+          types: "./esm/cli/mod.d.ts",
         },
       };
 
+      // The legacy pair, for a consumer on `moduleResolution: "node"`, which
+      // reads neither `exports` nor `module` and otherwise resolves nothing at
+      // all. `main` names the esm entry because that is the only entry there is:
+      // this package is esm only, so a commonjs consumer needs a dynamic import
+      // either way and there is nothing here that would change that.
+      pkgJson.main = "./esm/mod.js";
+      pkgJson.types = "./esm/mod.d.ts";
+
       // Add files field to ensure only needed files are published
+      // dnt emits declarations beside the javascript in `esm`, so there is no
+      // `types` directory and naming one leaves every `types` condition pointing
+      // at nothing. It resolved anyway, through typescript's fallback to a
+      // sibling `.d.ts`, which is why nothing noticed.
       pkgJson.files = [
         "esm",
-        "types",
         "schema",
         "README.md",
         "LICENSE",

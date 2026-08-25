@@ -10,11 +10,11 @@
  * A constant rather than a read of `deno.json`, because the config sits beside
  * this module in a clone and nowhere else. Installed from jsr the module lives
  * behind an `https:` URL; built into an npm or bun distribution the config is
- * not shipped at all. This was a static import, so the failure was not a wrong
- * version but a package that could not be loaded.
+ * not shipped at all. Reading it from there fails to load the package rather
+ * than reporting a wrong version.
  *
- * The duplication is real and is pinned by `tests/version_test.ts`, so the two
- * cannot drift apart without the suite saying so.
+ * The duplication is real, and the suite pins the two together so they cannot
+ * drift apart.
  */
 
 /**
