@@ -11,7 +11,7 @@
  */
 
 import type { AnteConfig } from "#core";
-import { deriveLicenseUrl, loadConfig } from "#core";
+import { deriveLicenseUrl } from "#core";
 import { installHook } from "#git";
 import { readJsonFile } from "#core";
 
@@ -133,8 +133,6 @@ export async function runInit(options: InitOptions = {}): Promise<InitResult> {
   let hooksInstalled = false;
   if (!options.skipHooks) {
     try {
-      // Load the full resolved config for hook generation
-      const resolvedConfig = await loadConfig(configPath);
       await installHook(targetDir);
       hooksInstalled = true;
       console.log("  Installed git hooks to .githooks/");

@@ -190,7 +190,8 @@ describe("the pre-commit hook", () => {
 });
 
 describe("the commit-msg hook", () => {
-  /** Try one message against a repo with the hooks installed. */
+  /** Whether the hook lets one message through. Each gets its own repository, so
+   * a set of them can be tried at once. */
   async function accepts(message: string): Promise<boolean> {
     const { dir, env } = await aRepo();
     await Deno.writeTextFile(join(dir, "m.ts"), "export const m = 1;\n");
@@ -199,46 +200,60 @@ describe("the commit-msg hook", () => {
     return done.code === 0;
   }
 
+  /** The ones that came out the wrong way, so a failure names them. */
+  async function wrong(
+    messages: readonly string[],
+    expected: boolean,
+  ): Promise<string[]> {
+    const took = await Promise.all(messages.map((m) => accepts(m)));
+    return messages.filter((_, at) => took[at] !== expected);
+  }
+
   it("takes the shapes the spec defines, including the ones it refused", async () => {
-    for (
-      const message of [
+    assertEquals(
+      await wrong([
         "feat: add a thing",
-        // The two that were refused. A breaking change is marked with `!` in the
-        // spec, and refusing it leaves dropping the mark as the only way past.
+        // The two that were refused. A breaking change is marked with `!` in
+        // the spec, and refusing it leaves dropping the mark as the only way
+        // past.
         "feat!: change a thing",
         "refactor!: rename an export",
         "fix(parser): stop at the separator",
         "chore(deps)!: drop node 20",
-        // 72 is git's subject convention. The cap was 50, and a longer subject was
-        // refused with a message about format that said nothing about length.
+        // 72 is git's subject convention. The cap was 50, and a longer subject
+        // was refused with a message about format that said nothing of length.
         `docs: ${"a".repeat(60)}`,
-      ]
-    ) {
-      assertEquals(await accepts(message), true, `refused: ${message}`);
-    }
+      ], true),
+      [],
+      "these are conventional commits and were refused",
+    );
   });
 
   it("still refuses what is not a conventional commit", async () => {
-    for (
-      const message of [
+    assertEquals(
+      await wrong([
         "add a thing",
         "Feat: capitalised type",
         "feat add a thing",
         "banana: not a type",
         `feat: ${"a".repeat(80)}`,
-      ]
-    ) {
-      assertEquals(await accepts(message), false, `accepted: ${message}`);
-    }
+      ], false),
+      [],
+      "these are not conventional commits and went through",
+    );
   });
 
   it("lets git's own wording through", async () => {
     // A merge subject is git's, not the author's, and holding it to the spec
     // blocks an ordinary merge for a reason nobody can act on.
-    for (
-      const message of ["Merge branch 'dev'", 'Revert "feat: a thing"', "fixup! feat: a thing"]
-    ) {
-      assertEquals(await accepts(message), true, `refused: ${message}`);
-    }
+    assertEquals(
+      await wrong([
+        "Merge branch 'dev'",
+        'Revert "feat: a thing"',
+        "fixup! feat: a thing",
+      ], true),
+      [],
+      "git wrote these subjects, and they were refused",
+    );
   });
 });
