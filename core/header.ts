@@ -79,9 +79,17 @@ function patterns(config?: ResolvedConfig): {
   contributor: RegExp;
   spdx: RegExp;
 } {
-  const prefix = quoted(config?.commentPrefix ?? DEFAULT_PREFIX);
+  const written = config?.commentPrefix ?? DEFAULT_PREFIX;
+  const prefix = quoted(written);
   const chars = quoted(
     [...new Set(DEFAULT_SEPARATORS + (config?.separatorChar ?? ""))].join(""),
+  );
+  // How far a contributor line is indented, which is the name column less what
+  // the prefix already occupies. At least one, because a column at or inside the
+  // prefix leaves no gap at all and the pattern would then claim every line.
+  const indent = Math.max(
+    1,
+    (config?.nameColumn ?? DEFAULT_NAME_COLUMN) - written.length,
   );
 
   return {
@@ -90,26 +98,54 @@ function patterns(config?: ResolvedConfig): {
       `^${prefix}\\s*Copyright\\s*\\(c\\)\\s*(\\d{4})(?:-(\\d{4}))?\\s+(.+?)\\s+(\\S+@\\S+)`,
       "i",
     ),
-    // The indent has to be deep enough that ordinary prose in a header cannot be
-    // mistaken for a contributor. A line reading `//  ported from libfoo, ask
-    // bugs@libfoo.org` is a note, and taking it for a contributor would push a
-    // real one off the end of the list. Ten columns is the floor, and the
-    // address has to end the line.
+    // The indent is the one the generator writes names at, so a line reading
+    // `//  ported from libfoo, ask bugs@libfoo.org` stays a note. The address
+    // has to end the line, and the name runs up to the last run of whitespace
+    // before it, which is what lets a name carry spaces of its own.
     //
-    // The name runs up to the last run of whitespace before the address, which
-    // is what lets a name carry spaces of its own. It is the loosest of the
-    // three patterns and is therefore tried last.
-    contributor: new RegExp(`^${prefix}\\s{10,}(.+?)\\s+(\\S+@\\S+)\\s*$`),
-    // The url and the address are both optional, and so is the whitespace that
-    // would separate them. A bare `SPDX-License-Identifier: MIT` is the form the
-    // spec's own examples show and the form every tagged tree already carries,
-    // and requiring a tail left it unrecognised, preserved verbatim, and then
-    // duplicated by the line this tool writes beside it.
-    spdx: new RegExp(
-      `^${prefix}\\s*SPDX-License-Identifier:\\s*(\\S+)(?:\\s+(https?://\\S+))?(?:\\s+(\\S+@\\S+))?\\s*$`,
-      "i",
+    // This is the loosest of the patterns and is therefore tried last.
+    contributor: new RegExp(
+      `^${prefix}\\s{${indent},}(.+?)\\s+(\\S+@\\S+)\\s*$`,
     ),
+    // The tag alone claims the line. Everything after it is a tail this pattern
+    // does not read, because `licenceOf` reads it: an expression can be a single
+    // identifier, or `MIT OR Apache-2.0`, or a parenthesised expression with
+    // spaces throughout, and a pattern shaped around one of those loses the
+    // others. A licence line half-claimed is preserved verbatim and then has a
+    // generated one written beside it, once per repair.
+    spdx: new RegExp(`^${prefix}\\s*SPDX-License-Identifier:\\s*(.*)$`, "i"),
   };
+}
+
+/**
+ * The three fields on a licence line, taken from its tail.
+ *
+ * Read from the right, because that is the end that is fixed. The address, if
+ * there is one, is last; the url, if there is one, is before it; and everything
+ * still standing is the licence expression, spaces and all.
+ */
+function licenceOf(tail: string): {
+  licence: string | null;
+  url: string | null;
+  email: string | null;
+} {
+  let rest = tail.trim();
+  let email: string | null = null;
+  let url: string | null = null;
+
+  const address = rest.match(/(?:^|\s)(\S+@\S+)$/);
+  if (address) {
+    email = address[1];
+    rest = rest.slice(0, rest.length - address[1].length).trim();
+  }
+
+  const link = rest.match(/(?:^|\s)(https?:\/\/\S+)$/);
+  if (link) {
+    url = link[1];
+    rest = rest.slice(0, rest.length - link[1].length).trim();
+  }
+
+  return { licence: rest === "" ? null : rest, url, email };
 }
 
 /** The comment prefix a project gets without saying anything. */
@@ -117,6 +153,9 @@ const DEFAULT_PREFIX = "//";
 
 /** Every separator character the tool has written, so old files keep reading. */
 const DEFAULT_SEPARATORS = "-=*";
+
+/** The column names are written at when nothing says otherwise. */
+const DEFAULT_NAME_COLUMN = 40;
 
 /** A literal, safe to drop into a pattern. */
 function quoted(text: string): string {
@@ -175,9 +214,10 @@ export function parseHeader(
     // Check for SPDX line
     const spdxMatch = here.match(line.spdx);
     if (spdxMatch) {
-      spdxLicense = spdxMatch[1];
-      licenseUrl = spdxMatch[2] || null;
-      maintainerEmail = spdxMatch[3] || null;
+      const read = licenceOf(spdxMatch[1]);
+      spdxLicense = read.licence;
+      licenseUrl = read.url;
+      maintainerEmail = read.email;
       continue;
     }
 
@@ -324,17 +364,8 @@ export function updateHeader(
     }
   }
 
-  // The limit bounds how long a fresh header gets. It never shortens one that
-  // is already there: a name in the file is somebody credited, and no
-  // configuration change, and no line this tool misread as a contributor, gets
-  // to take a credit away.
-  const room = {
-    ...config,
-    maxContributors: Math.max(config.maxContributors, contributors.length),
-  };
-
   return generateHeader(
-    room,
+    config,
     contributors,
     yearStart,
     yearEnd,

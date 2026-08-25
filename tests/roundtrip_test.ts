@@ -37,20 +37,6 @@ function shaped(over: Partial<ResolvedConfig>): ResolvedConfig {
 }
 
 /**
- * The narrowest name column the format supports.
- *
- * A contributor line carries no year, so the only thing telling it apart from an
- * ordinary note in the header is how far it is indented. Ten columns after the
- * comment prefix is the floor, and a name column below that produces lines the
- * parser will not claim.
- *
- * The schema's own minimum is well above it, which is what keeps the floor
- * unreachable through configuration. `a name column the format cannot express`
- * is where that gap is held down.
- */
-const NARROWEST = 12;
-
-/**
  * The ends of every configurable range, from `schema/config.schema.json`.
  *
  * The sweep runs the extremes rather than a comfortable middle, because the
@@ -310,11 +296,27 @@ describe("a line in the header this tool did not write", () => {
     return `${[written[0], note, ...written.slice(1), closing].join("\n")}\n\nx;\n`;
   }
 
-  it("never costs a contributor, however far the line is indented", () => {
-    // A note is told from a contributor by its indent and a trailing address,
-    // and that guess is sometimes wrong. What must not follow from a wrong
-    // guess is somebody losing their credit: a misread note that pushes a real
-    // name past the limit would delete it silently on the next repair.
+  /** The addresses that survive one repair of a header with `note` spliced in. */
+  function survivors(
+    config: ResolvedConfig,
+    note: string,
+    who: Contributor[],
+  ): Set<string> {
+    const read = parseHeader(spliced(config, note, who), config);
+    const again = parseHeader(`${updateHeader(read!, config, {})}\n\nx;\n`, config);
+    return new Set(again?.contributors.map((one) => one.email));
+  }
+
+  /** The indent at which a line starts where the generator writes names. */
+  function shallower(config: ResolvedConfig): number {
+    return config.nameColumn - config.commentPrefix.length;
+  }
+
+  it("never costs a contributor, at any indent short of the name column", () => {
+    // A note is told from a contributor by its indent and a trailing address.
+    // What must not follow from a wrong guess is somebody losing their credit:
+    // a misread note pushes a real name past the limit and the next repair
+    // writes the header without it.
     //
     // So the assertion is the addresses, not the count. A count cannot tell a
     // note read as a contributor from a note read as a contributor that also
@@ -323,21 +325,61 @@ describe("a line in the header this tool did not write", () => {
     const who = people(3);
     const lost: string[] = [];
 
-    for (const indent of [0, 2, 10, config.nameColumn, config.nameColumn + 10]) {
+    for (const indent of [0, 2, 10, shallower(config) - 1]) {
       const note = `//${" ".repeat(indent)}Formerly maintained by old-team@example.com`;
-      const read = parseHeader(spliced(config, note, who), config);
-      const again = parseHeader(
-        `${updateHeader(read!, config, {})}\n\nx;\n`,
-        config,
-      );
-      const kept = new Set(again?.contributors.map((one) => one.email));
-
+      const kept = survivors(config, note, who);
       for (const one of who) {
         if (!kept.has(one.email)) lost.push(`indent=${indent} lost ${one.email}`);
       }
     }
 
     assertEquals(lost, []);
+  });
+
+  it("does cost one when the line sits at the name column itself", () => {
+    // The residue, recorded rather than repaired. At the column names are
+    // written at, ending in an address, a line is a contributor line by every
+    // signal there is, and one indented further is the second field of one.
+    // Nothing distinguishes it, so a note written there takes a place and the
+    // limit drops the last real name.
+    //
+    // The limit is the documented promise and it is kept. What it costs is
+    // this, and it costs it only to a note somebody indented to the width of
+    // the contributor column.
+    const config = shaped({ maxContributors: 3 });
+    const who = people(3);
+    const note = `//${" ".repeat(shallower(config))}Formerly maintained by old@example.com`;
+    const kept = survivors(config, note, who);
+
+    assertEquals(kept.has("old@example.com"), true);
+    assertEquals(kept.has(who[2].email), false);
+  });
+
+  it("holds the contributor limit on the path a repair takes", () => {
+    // `generateHeader` applies the limit and is tested where it is declared.
+    // What matters here is the path the tool actually walks on a file that
+    // already has a header, which is parse, update, write, over and over. A
+    // limit that only bounds a header being created is not a limit.
+    const config = shaped({ maxContributors: 3 });
+    let header = generateHeader(config, people(1), 2020, 2026);
+
+    for (let at = 0; at < 8; at++) {
+      const read = parseHeader(`${header}\n\nx;\n`, config);
+      header = updateHeader(read!, config, {
+        newContributor: { name: `P${at}`, email: `p${at}@example.com` },
+      });
+    }
+
+    assertEquals(parseHeader(`${header}\n\nx;\n`, config)?.contributors.length, 3);
+  });
+
+  it("keeps every name when the limit has room for the misread one too", () => {
+    const config = shaped({ maxContributors: 10 });
+    const who = people(3);
+    const note = `//${" ".repeat(shallower(config))}Formerly maintained by old@example.com`;
+    const kept = survivors(config, note, who);
+
+    for (const one of who) assertEquals(kept.has(one.email), true);
   });
 
   it("is written back once, not once per repair", () => {
@@ -354,6 +396,52 @@ describe("a line in the header this tool did not write", () => {
       once.split("\n").filter((line) => line.includes("SPDX-License-Identifier")).length,
       1,
     );
+  });
+
+  it("reads every shape of licence expression the spec admits", () => {
+    // The tag claims the line and the tail is decomposed afterwards, which is
+    // what lets an expression carry spaces. A pattern shaped around one of
+    // these forms reads that one and sends the rest to `extra`, where the tool
+    // writes a generated licence line beside each of them, once per repair.
+    const config = shaped({});
+    const forms = [
+      "MIT",
+      "MIT OR Apache-2.0",
+      "Apache-2.0 WITH LLVM-exception",
+      "GPL-2.0-or-later WITH Classpath-exception-2.0",
+      "(MIT OR Apache-2.0) AND BSD-3-Clause",
+    ];
+    const missed: string[] = [];
+
+    for (const licence of forms) {
+      const header = [
+        `//${"-".repeat(98)}`,
+        "// Copyright (c) 2020-2026              Ada                      ada@example.com",
+        `// SPDX-License-Identifier: ${licence}`,
+        `//${"-".repeat(98)}`,
+      ].join("\n");
+      const read = parseHeader(`${header}\n\nx;\n`, config);
+      if (read?.spdxLicense !== licence || read?.extra.length !== 0) {
+        missed.push(`${licence} -> ${read?.spdxLicense} extra=${read?.extra.length}`);
+      }
+    }
+
+    assertEquals(missed, []);
+  });
+
+  it("keeps the url and the address apart from the expression", () => {
+    const config = shaped({});
+    const header = [
+      `//${"-".repeat(98)}`,
+      "// Copyright (c) 2020-2026              Ada                      ada@example.com",
+      "// SPDX-License-Identifier: MIT OR Apache-2.0   https://example.org/l  c@x.dev",
+      `//${"-".repeat(98)}`,
+    ].join("\n");
+    const read = parseHeader(`${header}\n\nx;\n`, config);
+
+    assertEquals(read?.spdxLicense, "MIT OR Apache-2.0");
+    assertEquals(read?.licenseUrl, "https://example.org/l");
+    assertEquals(read?.maintainerEmail, "c@x.dev");
   });
 
   it("reads a bare licence tag, which carries no url and no address", () => {
@@ -373,69 +461,67 @@ describe("a line in the header this tool did not write", () => {
   });
 });
 
-describe("a name column the format cannot express", () => {
-  it("sits below every column the schema permits", () => {
-    // The floor is a property of the format and the schema is what keeps it out
-    // of reach. If a later schema lowered the minimum below the floor, the two
-    // cases underneath this one would start describing shapes a project can
-    // actually ask for.
-    assertEquals(BOUNDS.nameColumn.every((column) => column > NARROWEST), true);
+describe("the column the name is written at", () => {
+  it("is where a contributor line is looked for, whatever the prefix leaves of it", () => {
+    // The indent the parser requires is what the column leaves after the
+    // prefix, rather than a fixed number. The prefix is free-form text, so a
+    // long one against a narrow column leaves less room than any fixed floor
+    // would allow for, and the header then reads back with one contributor in
+    // it while looking correct on the page.
+    const missed: string[] = [];
+
+    for (const nameColumn of BOUNDS.nameColumn) {
+      for (const commentPrefix of ["//", "#", "<!--", "REM ", ";;;;;;;;;;;;;;"]) {
+        const config = shaped({
+          nameColumn,
+          emailColumn: within(nameColumn + 25, BOUNDS.emailColumn),
+          commentPrefix,
+        });
+        const written = generateHeader(config, people(3), 2020, 2026);
+        const read = parseHeader(`${written}\n\nconst x = 1;\n`, config);
+        if (read?.contributors.length !== 3) {
+          missed.push(
+            `nameColumn=${nameColumn} prefix=${commentPrefix} read ${read?.contributors.length}`,
+          );
+        }
+      }
+    }
+
+    assertEquals(missed, []);
   });
 
-  it("does not claim the contributor lines it writes below the floor", () => {
-    // Recorded rather than repaired, and unreachable through configuration per
-    // the case above. Nothing distinguishes a shallow contributor line from a
-    // note somebody wrote in the header.
-    const config = shaped({ nameColumn: NARROWEST - 1, emailColumn: 40 });
-    const written = generateHeader(config, people(3), 2020, 2026);
-    const read = parseHeader(`${written}\n\nconst x = 1;\n`, config);
-
-    assertEquals(read?.contributors.length, 1);
-  });
-
-  it("claims all of them at the floor, which is the boundary", () => {
-    const config = shaped({ nameColumn: NARROWEST, emailColumn: 40 });
-    const written = generateHeader(config, people(3), 2020, 2026);
-    const read = parseHeader(`${written}\n\nconst x = 1;\n`, config);
-
-    assertEquals(read?.contributors.length, 3);
-  });
-
-  it("does read a deeply indented note ending in an address as one", () => {
-    // The boundary, recorded rather than repaired. A contributor line carries no
-    // year and no keyword, so the indent and the trailing address are all there
-    // is to go on, and a note wearing both is a contributor line. Indenting a
-    // note less far, which is what anybody writes, keeps it a note.
-    //
-    // The misread is the whole of what goes wrong: `never costs a contributor`
-    // holds the part that would have mattered, which is that nobody is dropped
-    // to make room for it.
-    const config = shaped({ maxContributors: 3 });
-    const written = generateHeader(config, people(3), 2020, 2026).split("\n");
-    const closing = written.pop() as string;
-    const note = `//${" ".repeat(10)}See NOTICE, ask legal@example.com`;
-    const read = parseHeader(
-      `${[...written, note, closing].join("\n")}\n\nx;\n`,
-      config,
-    );
-
-    assertEquals(read?.contributors.length, 4);
-    assertEquals(read?.extra, []);
-  });
-
-  it("does not read a note in the header as a contributor", () => {
+  it("does not read a note indented less far as a contributor", () => {
     const config = shaped({});
     const written = generateHeader(config, people(2), 2020, 2026).split("\n");
     const closing = written.pop() as string;
     const note = "//  ported from libfoo, ask bugs@libfoo.org about it";
     const read = parseHeader(
       `${[written[0], note, ...written.slice(1), closing].join("\n")}\n\nx;\n`,
+      config,
     );
 
-    assertEquals(read?.contributors.map((one) => one.name), [
-      "a",
-      "orgrinrt",
-    ]);
+    assertEquals(read?.contributors.map((one) => one.name), ["a", "orgrinrt"]);
     assertEquals(read?.extra, [note]);
+  });
+
+  it("hands the old lines to `extra` when it is widened under a written header", () => {
+    // Recorded rather than repaired. A header written at one column and read at
+    // a wider one has contributor lines indented less far than the parser now
+    // looks, so they read as lines it does not model. They are preserved
+    // verbatim and the header stays a fixed point, which is the property that
+    // matters; what is lost is that the names stop being names to the tool
+    // until somebody commits again.
+    const narrow = shaped({ nameColumn: 20, emailColumn: 45 });
+    const wide = shaped({ nameColumn: 60, emailColumn: 90 });
+    const written = generateHeader(narrow, people(3), 2020, 2026);
+    const read = parseHeader(`${written}\n\nx;\n`, wide);
+
+    assertEquals(read?.contributors.length, 1);
+    assertEquals(read?.extra.length, 2);
+
+    const repaired = updateHeader(read!, wide, {});
+    const again = parseHeader(`${repaired}\n\nx;\n`, wide);
+    assertEquals(again?.extra, read?.extra);
+    assertEquals(updateHeader(again!, wide, {}), repaired);
   });
 });
