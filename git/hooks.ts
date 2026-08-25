@@ -15,7 +15,6 @@
  * @module
  */
 
-import type { ResolvedConfig } from "#core";
 import { run } from "../core/run.ts";
 import { VERSION } from "../core/version.ts";
 
@@ -93,13 +92,31 @@ export function generateCommitMsgHook(): string {
 #----------------------------------------------------------------------------------------------------
 
 commit_msg_file=$1
-commit_msg=$(cat "$commit_msg_file")
-pattern="^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert): .{1,50}"
+commit_msg=$(head -1 "$commit_msg_file")
+
+# A merge or a fixup is git's wording, not the author's, and holding it to this
+# blocks an ordinary merge for a reason nobody can act on.
+case "$commit_msg" in
+  "Merge "*|"Revert "*|"fixup!"*|"squash!"*|"#"*) exit 0 ;;
+esac
+
+# The spec's shape: a type, an optional scope in parentheses, an optional '!' for
+# a breaking change, then the subject. The '!' was missing here, so every
+# breaking change any project using this hook wanted to mark was refused, and the
+# only way past it was to drop the mark.
+#
+# 72 is git's own subject convention. It used to be 50, which is the soft advice
+# for the summary line and reads as a format error when a longer subject is
+# refused for a reason the message does not mention.
+types="feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert"
+pattern="^($types)(\\([a-z0-9_.-]+\\))?!?: .{1,72}$"
 
 if ! echo "$commit_msg" | grep -qE "$pattern"; then
-  echo "Error: Commit message does not follow Conventional Commits format."
-  echo "Format: <type>: <subject>"
-  echo "Example: feat: add new feature"
+  echo "Commit message does not follow Conventional Commits."
+  echo "  <type>[(scope)][!]: <subject>, subject at most 72 characters"
+  echo "  types: $types"
+  echo "  for example: feat: add new feature, or refactor!: rename the export"
+  echo "  yours: $commit_msg"
   exit 1
 fi
 `;
@@ -108,13 +125,16 @@ fi
 /**
  * Installs the git hooks to the specified directory.
  *
+ * It takes no configuration. The hook it writes runs `ante fix`, which reads the
+ * config itself at the moment it runs, so a hook installed today keeps working
+ * after the config changes. Baking the settings into the hook is what the shell
+ * copy did, and it is how the two came to disagree.
+ *
  * @param targetDir - The project root directory
- * @param config - The resolved configuration
  * @returns Promise resolving when installation is complete
  */
 export async function installHook(
   targetDir: string,
-  config: ResolvedConfig,
 ): Promise<void> {
   const hooksDir = `${targetDir}/${HOOKS_DIR}`;
 

@@ -135,7 +135,7 @@ export async function runInit(options: InitOptions = {}): Promise<InitResult> {
     try {
       // Load the full resolved config for hook generation
       const resolvedConfig = await loadConfig(configPath);
-      await installHook(targetDir, resolvedConfig);
+      await installHook(targetDir);
       hooksInstalled = true;
       console.log("  Installed git hooks to .githooks/");
       console.log("  Configured git to use .githooks/ as hooks path");
