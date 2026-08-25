@@ -24,7 +24,8 @@ import { hasValidHeader } from "../../npm/esm/mod.js";
 
 console.log("Running Ante smoke test (Node/Bun)...");
 
-const SAMPLE_HEADER = `//----------------------------------------------------------------------------------------------------
+const SAMPLE_HEADER =
+  `//----------------------------------------------------------------------------------------------------
 // Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
 // SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
 //----------------------------------------------------------------------------------------------------
@@ -49,27 +50,26 @@ try {
   // Test 1: Content without header
   assert(
     hasValidHeader(SAMPLE_CONTENT) === false,
-    "Should return false for content without header"
+    "Should return false for content without header",
   );
 
   // Test 2: Content with valid header
   assert(
     hasValidHeader(FULL_FILE) === true,
-    "Should return true for content with valid header"
+    "Should return true for content with valid header",
   );
 
   // Test 3: Empty string
   assert(
     hasValidHeader("") === false,
-    "Should return false for empty string"
+    "Should return false for empty string",
   );
 
   // Test 4: Just the header (no content)
   assert(
     hasValidHeader(SAMPLE_HEADER) === true,
-    "Should return true for just the header"
+    "Should return true for just the header",
   );
-
 } catch (err) {
   console.error("CRITICAL: Uncaught exception during smoke test:");
   console.error(err);

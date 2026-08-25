@@ -484,11 +484,22 @@ export function validateHeader(
 /**
  * Checks if content starts with a shebang line.
  *
+ * A shebang names an interpreter, so what follows `#!` is a path. Rust's inner
+ * attribute syntax opens the same two characters and then a bracket, and a file
+ * beginning `#![no_std]` is not executable by anything. Reading one as a shebang
+ * puts the header on the second line, where the check that placed it will not
+ * find it again.
+ *
+ * The test is the two characters and a bracket, which is not the whole of rustc's
+ * rule: it takes the next token after `#!`, so `#! [no_std]` with a space between
+ * is a valid inner attribute and this still reads it as a shebang. Nobody writes
+ * it that way, and the wider test wants a tokeniser rather than a prefix.
+ *
  * @param content - The file content to check
  * @returns The shebang line if present, or null
  */
 function extractShebang(content: string): { shebang: string; rest: string } | null {
-  if (content.startsWith("#!")) {
+  if (content.startsWith("#!") && !content.startsWith("#![")) {
     const newlineIndex = content.indexOf("\n");
     if (newlineIndex === -1) {
       return { shebang: content, rest: "" };
