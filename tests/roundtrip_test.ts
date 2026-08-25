@@ -21,7 +21,7 @@
 
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { describe, it } from "@std/testing/bdd";
-import { destroyed } from "./conservation.ts";
+import { destroyed, people } from "./conservation.ts";
 import {
   type Contributor,
   deriveLicenseUrl,
@@ -72,22 +72,6 @@ const BOUNDS = {
 /** A column pulled back inside the range the schema permits. */
 function within(value: number, range: readonly number[]): number {
   return Math.min(range[range.length - 1], Math.max(range[0], value));
-}
-
-/** Names either side of the width at which one overruns its column. */
-const NAMES = [
-  "a",
-  "orgrinrt",
-  "Ada Lovelace",
-  "Jean-Baptiste Grenouille",
-  "A Name That Is Considerably Longer Than Any Column",
-];
-
-function people(count: number): Contributor[] {
-  return NAMES.slice(0, count).map((name, at) => ({
-    name,
-    email: `p${at}@example.com`,
-  }));
 }
 
 /** Every shape the sweep covers, as a flat list so a failure names itself. */

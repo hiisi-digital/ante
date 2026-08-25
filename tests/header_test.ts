@@ -19,6 +19,7 @@ import {
 import { assertEquals } from "@std/assert";
 import { describe, it } from "@std/testing/bdd";
 import { DEFAULT_CONFIG } from "../core/config.generated.ts";
+import { people } from "./conservation.ts";
 
 const SAMPLE_HEADER =
   `//----------------------------------------------------------------------------------------------------
@@ -466,19 +467,13 @@ describe("a header written twice over the same file", () => {
 });
 
 describe("the names a header will not carry", () => {
-  const people = (n: number) =>
-    Array.from({ length: n }, (_, i) => ({
-      name: `Person ${i}`,
-      email: `p${i}@x.dev`,
-    }));
-
   it("is empty while the limit has room, and names the tail once it does not", () => {
     const config = { ...DEFAULT_CONFIG, maxContributors: 3 };
     assertEquals(omittedContributors(people(0), config), []);
     assertEquals(omittedContributors(people(3), config), []);
     assertEquals(
       omittedContributors(people(5), config).map((c) => c.name),
-      ["Person 3", "Person 4"],
+      people(5).slice(3).map((c) => c.name),
     );
   });
 
