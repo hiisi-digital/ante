@@ -1,6 +1,6 @@
 {
   "name": "@hiisi/ante",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "Copyright headers as a maintained artifact. Checked, fixed and kept consistent across a whole tree.",
   "license": "MPL-2.0",
   "exports": {
