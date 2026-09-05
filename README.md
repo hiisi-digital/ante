@@ -12,8 +12,6 @@
 
 </div>
 
-## What it is
-
 `ante` maintains the copyright header at the top of a source file. Year ranges,
 contributor lists, the SPDX identifier and the column alignment are all derived
 rather than typed in, and re-derived when the file changes. It runs as a command
@@ -31,49 +29,7 @@ The format is configuration. Column positions, line width, separator character
 and how contributors are chosen come from `deno.json`, `package.json` or a
 standalone `ante.toml`, whichever the project already has.
 
-## Status
-
-Under active development, so the api hasn't settled and breaking changes should
-be expected. We'll do our best to document migrations where they're needed.
-
-Three things to know about 0.3.0. A field that overruns its column keeps two
-spaces after it rather than one, so the first `fix` after upgrading reformats
-existing headers once and then holds still. `ParsedHeader` carries a new `extra`
-field, which is a break for anything constructing one by hand. And a header block
-written to somebody else's convention is now kept: whatever `ante` cannot model
-in it comes through the rewrite verbatim, where earlier versions replaced the
-whole block. If a tree has been through an older `fix`, its third-party notices
-are worth a look before this one runs.
-
-### One thing it does not keep
-
-The licence a file declares is not preserved. `ante` writes the licence the
-project configured, so a vendored file saying `SPDX-License-Identifier: ISC`
-comes out saying whatever is in the manifest. Measured against 244 header blocks
-taken from vendored source, 98 of them are in that class.
-
-Nothing is deleted and it is stable across runs, and it is still the tool making
-a false statement about somebody else's code, which is the one output here that
-is expensive to find out about late. So keep vendored trees out of `include`, or
-in `exclude`, until this settles. What `ante` should do instead is an open
-question rather than an oversight: refuse the file, skip it, carry the
-declaration through as a line it does not model, or keep stamping over it.
-
-## Contents
-
-| Piece                            | What it is for                                                                              |
-| :------------------------------- | :------------------------------------------------------------------------------------------ |
-| `ante check`                     | Verifies headers and exits non-zero when any is wrong. The thing a hook or a pipeline runs. |
-| `ante check src`                 | The same over one directory. A run matching no file is an error, not a pass.                |
-| `ante fix`                       | Rewrites every header to match the configuration.                                           |
-| `ante add`                       | Puts a header on one named file.                                                            |
-| `ante init`                      | Writes a configuration and installs the git hooks.                                          |
-| `loadConfig` / `resolveConfig`   | Reads the configuration from whichever manifest holds it, and fills in what is derivable.   |
-| `generateHeader`                 | Builds a header from a configuration, a contributor list and a year.                        |
-| `parseHeader` / `hasValidHeader` | Reads a header back out of a file, and answers whether one is there and correct.            |
-| `rewriteHeader`                  | Writes a header over whatever was at the top, keeping every line it does not model.         |
-
-## Installation
+## Usage
 
 The command is `ante` on every runtime. The flags are the permissions it needs
 and nothing more: it reads the tree, writes headers back, and asks `git` who
@@ -102,41 +58,20 @@ lines above work. The name is pinned with `--name` because deno reads `cli` as a
 generic file stem and would otherwise call the command after the directory it
 came from.
 
-As a library, `jsr:@hiisi/ante` on deno and `ante-cli` on node, both exporting
-the same names:
-
-```typescript
-import { generateHeader, loadConfig } from "jsr:@hiisi/ante";
-```
-
-Or as a dependency:
-
-```jsonc
-// deno.json
-{
-  "imports": {
-    "@hiisi/ante": "jsr:@hiisi/ante@^0.3"
-  }
-}
-
-// package.json
-{
-  "devDependencies": {
-    "ante-cli": "^0.3"
-  }
-}
-```
-
-## Command line
+The five commands are what a project needs day to day. `check` verifies and
+exits non-zero when a header is wrong, which is what a hook or a pipeline runs,
+and a run matching no file is an error rather than a pass. `fix` rewrites every
+header to match the configuration, `add` puts one on a single named file, and
+`init` writes a configuration and installs the git hooks.
 
 ```bash
-ante init                  # Set up config and install git hooks
-ante check                 # Verify headers (exits non-zero if issues found)
-ante check src             # Check one directory
-ante check "src/**/*.ts"   # Check specific files
-ante fix                   # Fix all headers to match config
-ante add src/new-file.ts   # Add header to a specific file
-ante --help                # Show help
+ante init                  # config and git hooks
+ante check                 # verify, non-zero when something is off
+ante check src             # one directory
+ante check "src/**/*.ts"   # one glob
+ante fix                   # rewrite every header to match the config
+ante add src/new-file.ts   # header on one file
+ante --help
 ```
 
 As project scripts:
@@ -159,9 +94,7 @@ As project scripts:
 }
 ```
 
-## Configuration
-
-An `ante` section in `deno.json` or `package.json` holds it:
+An `ante` section in `deno.json` or `package.json` holds the configuration:
 
 ```json
 {
@@ -178,11 +111,11 @@ An `ante` section in `deno.json` or `package.json` holds it:
 }
 ```
 
-### ante.toml, for projects with no JSON manifest
-
-A rust crate, a bash library or a c project has no `deno.json` or
-`package.json` to put an `ante` section in. Those get an `ante.toml` instead,
-where the whole file is the configuration:
+A rust crate, a bash library or a c project has no such manifest to put a
+section in, so those get an `ante.toml` instead, where the whole file is the
+configuration. Same keys, same schema, same defaults, and an `[ante]` table is
+accepted too, so one file can move between the standalone and the embedded shape
+unchanged.
 
 ```toml
 width = 100
@@ -193,51 +126,28 @@ include = ["src/**/*.rs"]
 exclude = ["target/**"]
 ```
 
-Same keys, same schema, same defaults. An `[ante]` table is also accepted, so
-one file can move between the standalone and embedded shapes unchanged.
-
-`ante.toml` is searched for ahead of the JSON manifests, because a project only
+`ante.toml` is searched for ahead of the JSON manifests, since a project only
 writes one when it means to configure ante there. It carries no `license` of its
-own, so the SPDX identifier is read from whichever manifest sits beside it:
-`[package] license` in a `Cargo.toml`, or the top-level `license` in a JSON
-manifest. Setting `spdxLicense` in the toml overrides that.
+own, so the SPDX identifier is read from whichever manifest sits beside it,
+`[package] license` in a `Cargo.toml` or the top-level `license` in a JSON
+manifest, and setting `spdxLicense` in the toml overrides that.
 
-Most keys have a default worth keeping. `spdxLicense` and `licenseUrl` are both
-derived from the manifest's own `license` field, so neither usually needs
-setting.
+`ante init` also installs a pre-commit hook, which runs `ante fix` over the
+staged files and stages whatever changed, so it does the same thing the command
+does and the configuration decides which files it touches. The hook wants `ante`,
+`deno` or `npx` on the path and looks for them in that order; with none of the
+three it says so and lets the commit through, which means it can be installed and
+sit there doing nothing on a machine that has none. Alongside it goes a
+commit-msg hook that rejects anything not in Conventional Commits form, being a
+type, an optional scope, an optional `!` for a breaking change, then a subject of
+up to 72 characters. Git's own merge, revert and fixup wording goes through
+untouched.
 
-### Configuration keys
+## Example
 
-| Option                 | Default                       | Description                         |
-| :--------------------- | :---------------------------- | :---------------------------------- |
-| `width`                | `100`                         | Total line width for headers        |
-| `separatorChar`        | `"-"`                         | Character used for separator lines  |
-| `commentPrefix`        | `"//"`                        | Comment prefix for header lines     |
-| `nameColumn`           | `40`                          | Column position where name starts   |
-| `emailColumn`          | `65`                          | Column position where email starts  |
-| `licenseUrlColumn`     | `40`                          | Column for license URL in SPDX line |
-| `maintainerColumn`     | `75`                          | Column for maintainer in SPDX line  |
-| `spdxLicense`          | from `license`                | SPDX license identifier             |
-| `licenseUrl`           | derived                       | URL for the license                 |
-| `maintainerEmail`      | from git                      | Maintainer contact email            |
-| `maxContributors`      | `3`                           | Max contributors shown in header    |
-| `contributorSelection` | `"commits"`                   | How to pick contributors            |
-| `manualContributors`   | `[]`                          | Explicit contributor list           |
-| `include`              | `["**/*.ts", ...]`            | Files to process                    |
-| `exclude`              | `["**/node_modules/**", ...]` | Files to skip                       |
-
-### Contributor selection
-
-| Strategy  | Description                                      |
-| :-------- | :----------------------------------------------- |
-| `commits` | Contributors with most commits touching the file |
-| `lines`   | Contributors with most lines changed             |
-| `recent`  | Most recent contributors                         |
-| `manual`  | Use `manualContributors` list                    |
-
-## Library
-
-The same pieces the command line is built from, exported.
+As a library the pieces are the ones the command line is built from, and they
+compose the same way. Reading a file, deciding whether it wants a header, and
+writing one that carries the contributors git knows about:
 
 ```typescript
 import {
@@ -271,38 +181,122 @@ if (!hasValidHeader(content)) {
 
 `parseHeader` reads an existing header back into its parts and `updateHeader`
 edits those parts, which is the path `fix` takes rather than regenerating from
-nothing. A file outside a git repository gets no contributors and no year range,
-and both calls answer with that rather than failing.
+nothing. `rewriteHeader` puts the result over whatever was at the top and keeps
+every line it does not model. A file outside a git repository gets no
+contributors and no year range, and both calls answer with that rather than
+failing.
 
-## Git hooks
+## Motivation
 
-The `init` command installs a pre-commit hook that:
+A licence that asks for a notice on the file, and MPL-2.0 does, turns every
+source file into something with a small piece of paperwork attached to it. The
+year is only right until january, the contributor list is only right until
+somebody else touches the file, and the alignment is only right until a name
+longer than the last one arrives. So the notice is correct on the day it is
+written and drifts from then on, quietly, in the one part of the file nobody
+reads twice.
 
-1. Checks staged `.ts` files for copyright headers
-2. Creates headers for files that don't have one
-3. Adds the current git user as a contributor if not already present
-4. Updates year ranges when files are modified in a new year
-5. Stages the changes automatically
+The usual answer is a template somebody pastes in, and it is the wrong shape,
+because a template records what was true once where the thing wanted is a value
+derived from the repository as it stands. `ante` derives it: the years come off
+the file's own history, the contributors come off who touched it and how much,
+the identifier comes off the manifest that already declares the licence. Nothing
+in the header is typed by hand, so nothing in it can be stale in a way a rerun
+does not fix.
 
-```bash
-ante init
-```
+What it costs is a pass over the tree, which the pre-commit hook narrows to the
+staged files, and a decision about which files are in scope. That second one is
+the part worth thinking about, since a header written over somebody else's
+vendored source is a false statement rather than an untidy one.
 
-This writes hook scripts to `.githooks/` and configures git to use them. `init`
-also installs a commit-msg hook that rejects commit messages not in Conventional
-Commits format (`type: subject`).
+## Extras
 
-## Years
+### Status
+
+Under active development, so the api hasn't settled and breaking changes should
+be expected. We'll do our best to document migrations where they're needed.
+
+Three things to know about 0.3.0. A field that overruns its column keeps two
+spaces after it rather than one, so the first `fix` after upgrading reformats
+existing headers once and then holds still. `ParsedHeader` carries a new `extra`
+field, which is a break for anything constructing one by hand. And a header block
+written to somebody else's convention is now kept: whatever `ante` cannot model
+in it comes through the rewrite verbatim, where earlier versions replaced the
+whole block. If a tree has been through an older `fix`, its third-party notices
+are worth a look before this one runs.
+
+### Runtimes
+
+| Runtime | Installs from      | Minimum    | Differences                                  |
+| :------ | :----------------- | :--------- | :------------------------------------------- |
+| deno    | jsr, `@hiisi/ante` | 2          | none; this is where the suite runs           |
+| node    | npm, `ante-cli`    | 18         | the npm build, so the same api through `dnt` |
+| bun     | npm, `ante-cli`    | none known | the npm build, as node                       |
+
+Development happens on deno 2 and that is what the test suite runs under. Node
+and bun both consume the npm build, and `deno task test:node` builds it and then
+runs a smoke test, a git test and a types check against it, so those three are
+covered on whatever node version the machine happens to have. None of it runs on
+a schedule, so there is no live matrix. There is a [snapshot][compat] from
+december 2025 that went version by version across all three runtimes, kept for
+the detail rather than as a current answer, and it reports a lot of red on the
+node and bun rows against a build two minor versions old, so do read it as
+history.
+
+### Configuration
+
+Most keys have a default worth keeping, and `spdxLicense` and `licenseUrl` are
+both derived from the manifest's own `license` field, so neither usually needs
+setting.
+
+| Option                 | Default                       | What it decides                              |
+| :--------------------- | :---------------------------- | :------------------------------------------- |
+| `width`                | `100`                         | total line width for a header                |
+| `separatorChar`        | `"-"`                         | character the separator lines are drawn with |
+| `commentPrefix`        | `"//"`                        | comment prefix on every header line          |
+| `nameColumn`           | `40`                          | column a contributor name starts at          |
+| `emailColumn`          | `65`                          | column a contributor email starts at         |
+| `licenseUrlColumn`     | `40`                          | column the licence url starts at             |
+| `maintainerColumn`     | `75`                          | column the maintainer address starts at      |
+| `spdxLicense`          | from `license`                | SPDX identifier written into the header      |
+| `licenseUrl`           | derived                       | url the identifier links to                  |
+| `maintainerEmail`      | from git                      | maintainer address on the SPDX line          |
+| `maxContributors`      | `3`                           | how many contributors a header carries       |
+| `contributorSelection` | `"commits"`                   | how those contributors are picked            |
+| `manualContributors`   | `[]`                          | the list `manual` selection reads            |
+| `include`              | `["**/*.ts", ...]`            | files a run walks                            |
+| `exclude`              | `["**/node_modules/**", ...]` | files it skips                               |
+
+`contributorSelection` takes one of four. `commits` picks whoever has the most
+commits touching the file and is the default, `lines` counts changed lines
+instead, `recent` takes the latest to touch it, and `manual` ignores git and
+reads `manualContributors`.
+
+### Years
 
 A file created and last modified in the same year gets a single year, `2025`. One
 modified across years gets a range, `2020-2025`, and the end of that range moves
 on its own the first time the file is touched in a new year.
 
+### Limitations
+
+The licence a file declares is not preserved. `ante` writes the licence the
+project configured, so a vendored file saying `SPDX-License-Identifier: ISC`
+comes out saying whatever is in the manifest. Measured against 244 header blocks
+taken from vendored source, 98 of them are in that class.
+
+Nothing is deleted and it is stable across runs, and it is still the tool making
+a false statement about somebody else's code, which is the one output here that
+is expensive to find out about late. So keep vendored trees out of `include`, or
+in `exclude`, until this settles. What `ante` should do instead is an open
+question rather than an oversight: refuse the file, skip it, carry the
+declaration through as a line it does not model, or keep stamping over it.
+
 ## Support
 
-Whether you use this project, have learned something from it, or just like it,
-please consider supporting it by buying me a coffee, so I can dedicate more time
-on open-source projects like this :)
+Feel free to contribute! If unsure about wasting work, the best practice is to throw in an issue describing what you'd do, and only then commit to writing a big PR, because chances are, it might not be something that belongs here. However, forks are always a valid choice and we'd encourage everyone to experiment and have their own takes on this. When doing this, do mind the license(s) though!
+
+Whether you use this project, have learned something from it, or just like it, please consider supporting it by buying me a coffee, so I can dedicate more time on open-source projects like this :)
 
 <a href="https://buymeacoffee.com/orgrinrt" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: auto !important;width: auto !important;" ></a>
 
@@ -313,18 +307,5 @@ on open-source projects like this :)
 `SPDX-License-Identifier: MPL-2.0`
 
 > You can check out the full license [here](https://github.com/hiisi-digital/ante/blob/main/LICENSE)
-
-## Runtime compatibility
-
-Development happens on deno 2 and that's what the test suite runs under. Node
-and bun both consume the npm build, and `deno task test:node` builds it and then
-runs a smoke test, a git test and a types check against it, so those three are
-covered on whatever node version the machine happens to have.
-
-None of it runs on a schedule, so there's no live matrix. There is a
-[snapshot][compat] from december 2025 that went version by version across all
-three runtimes, kept for the detail rather than as a current answer. It reports
-a lot of red on the node and bun rows, against a build two minor versions old,
-so read it as history.
 
 [compat]: https://github.com/hiisi-digital/ante/blob/main/COMPATIBILITY.md
