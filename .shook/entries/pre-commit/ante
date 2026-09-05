@@ -1,0 +1,9 @@
+
+deno
+run
+-R
+-W
+--allow-run
+--allow-env
+cli/mod.ts
+fix
