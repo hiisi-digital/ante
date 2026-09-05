@@ -1,8 +1,8 @@
-//----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025-2026                    orgrinrt                    orgrinrt@ikiuni.dev
+//--------------------------------------------------------------------------------------------------
+// Copyright (c) 2025-2026              orgrinrt                 orgrinrt@ikiuni.dev
 //                                      orgrinrt                 ort@hiisi.digital
-// SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
-//----------------------------------------------------------------------------------------------------
+// SPDX-License-Identifier: MPL-2.0     https://mozilla.org/MPL/2.0        ort@hiisi.digital
+//--------------------------------------------------------------------------------------------------
 
 import { CONFIG_BOUNDS, deriveLicenseUrl, resolveConfig } from "#core";
 import { assertEquals, assertThrows } from "@std/assert";

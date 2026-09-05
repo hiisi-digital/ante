@@ -5,11 +5,12 @@
 # means it runs beside everything else the repository wants rather than in place
 # of it, and that nothing is installed until somebody asks for it.
 #
-# Run from source rather than from a binary called `ante`, because the `ante` on
-# a path is as likely to be the Ante language compiler, which takes the same
-# arguments and does nothing with them.
+# It points at a script rather than naming the command directly, because the job
+# is two commands: fix the headers, then stage what the fix changed. `run` is an
+# argv and never a shell, so it cannot express that, and the script is the
+# documented way to say it. What it runs is then readable in a diff.
 
 name = "ante"
 
 [hooks.pre-commit]
-run = ["deno", "run", "-R", "-W", "--allow-run", "--allow-env", "cli/mod.ts", "fix"]
+run = ["sh", "scripts/pre-commit.sh"]
