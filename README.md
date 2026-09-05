@@ -67,7 +67,7 @@ declaration through as a line it does not model, or keep stamping over it.
 | `ante check src`                 | The same over one directory. A run matching no file is an error, not a pass.                |
 | `ante fix`                       | Rewrites every header to match the configuration.                                           |
 | `ante add`                       | Puts a header on one named file.                                                            |
-| `ante init`                      | Writes a configuration and installs the git hooks.                                          |
+| `ante init`                      | Writes a configuration into whichever manifest the project already has.                     |
 | `loadConfig` / `resolveConfig`   | Reads the configuration from whichever manifest holds it, and fills in what is derivable.   |
 | `generateHeader`                 | Builds a header from a configuration, a contributor list and a year.                        |
 | `parseHeader` / `hasValidHeader` | Reads a header back out of a file, and answers whether one is there and correct.            |
@@ -130,7 +130,7 @@ Or as a dependency:
 ## Command line
 
 ```bash
-ante init                  # Set up config and install git hooks
+ante init                  # Write the configuration
 ante check                 # Verify headers (exits non-zero if issues found)
 ante check src             # Check one directory
 ante check "src/**/*.ts"   # Check specific files
@@ -274,25 +274,21 @@ edits those parts, which is the path `fix` takes rather than regenerating from
 nothing. A file outside a git repository gets no contributors and no year range,
 and both calls answer with that rather than failing.
 
-## Git hooks
+## Running it on every commit
 
-The `init` command installs a pre-commit hook. It runs `ante fix` over the staged
-files and stages whatever changed, so it does the same thing the command does and
-the config decides which files it touches.
+`ante check` exits non-zero when a header is wrong and `ante fix` writes them, so
+either one is what a pre-commit hook or a pipeline step runs. ante does not
+install a hook for you, and does not take `core.hooksPath`, because git gives one
+hook per event and a tool that claims it silently replaces whatever was there.
 
 ```bash
-ante init
+#!/bin/sh
+ante fix && git add -u
 ```
 
-The hook needs `ante`, `deno` or `npx` on the path, and it looks for them in that
-order. With none of them it says so and lets the commit through, which means it
-can be installed and sit there doing nothing on a machine that has none.
-
-This writes hook scripts to `.githooks/` and configures git to use them. `init`
-also installs a commit-msg hook that rejects anything not in Conventional Commits
-form: a type, an optional scope, an optional `!` for a breaking change, then a
-subject of up to 72 characters. Git's own merge, revert and fixup wording goes
-through untouched.
+With no arguments `ante fix` takes the include and exclude patterns from the
+config, so the hook and the command agree on which files are ante's business
+without the hook restating it.
 
 ## Years
 

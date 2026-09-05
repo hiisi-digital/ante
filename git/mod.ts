@@ -7,18 +7,14 @@
 /**
  * Everything that needs a repository.
  *
- * Reading history for contributors and year ranges, reading git's own config for
- * the maintainer, and installing the hooks.
+ * Reading history for contributors and year ranges, and reading git's own config
+ * for the maintainer.
  *
  * The reads answer with nothing outside a repository rather than failing, since
  * a file in a tarball is a normal thing to run over: `getStagedFiles` gives an
- * empty list and `isTrackedByGit` gives false. The installers are not in that
- * set and are not meant to be. `installHook` writes files and sets
- * `core.hooksPath`, and somewhere with no repository is somewhere it should
- * refuse.
+ * empty list and `isTrackedByGit` gives false.
  *
  * @module
  */
 
 export * from "./history.ts";
-export * from "./hooks.ts";

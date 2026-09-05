@@ -91,7 +91,6 @@
       "core/run.ts",
       "core/version.ts",
       "git/mod.ts",
-      "git/hooks.ts",
       "git/history.ts",
       "cli/mod.ts",
       "cli/commands/_files.ts",
@@ -105,8 +104,7 @@
     ],
     "exclude": [
       "tests/",
-      "scripts/",
-      ".githooks/"
+      "scripts/"
     ]
   },
   "ante": {

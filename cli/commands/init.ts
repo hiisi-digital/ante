@@ -7,12 +7,11 @@
 /**
  * CLI command: init
  *
- * Sets up ante configuration in deno.json and installs git hooks.
+ * Sets up ante configuration in deno.json.
  */
 
 import type { AnteConfig } from "#core";
 import { deriveLicenseUrl } from "#core";
-import { installHook } from "#git";
 import { readJsonFile } from "#core";
 
 /**
@@ -21,8 +20,6 @@ import { readJsonFile } from "#core";
 interface InitOptions {
   /** Skip interactive prompts and use defaults */
   yes?: boolean;
-  /** Skip git hook installation */
-  skipHooks?: boolean;
   /** Target directory (defaults to cwd) */
   dir?: string;
 }
@@ -33,8 +30,6 @@ interface InitOptions {
 interface InitResult {
   /** Whether config was created or updated */
   configUpdated: boolean;
-  /** Whether hooks were installed */
-  hooksInstalled: boolean;
   /** Path to the config file */
   configPath: string;
 }
@@ -129,38 +124,13 @@ export async function runInit(options: InitOptions = {}): Promise<InitResult> {
     console.log(`  ante configuration already exists in ${configPath}`);
   }
 
-  // Install hooks unless skipped
-  let hooksInstalled = false;
-  if (!options.skipHooks) {
-    try {
-      await installHook(targetDir);
-      hooksInstalled = true;
-      console.log("  Installed git hooks to .githooks/");
-      console.log("  Configured git to use .githooks/ as hooks path");
-    } catch (error) {
-      console.error(
-        "  Warning: Failed to install git hooks:",
-        error instanceof Error ? error.message : error,
-      );
-    }
-  } else {
-    console.log("  Skipped git hook installation");
-  }
-
   console.log("");
   console.log("Done! ante is now configured.");
-
-  if (hooksInstalled) {
-    console.log("");
-    console.log("The pre-commit hook will automatically:");
-    console.log("  - Add copyright headers to new TypeScript files");
-    console.log("  - Add you as a contributor when you modify files");
-    console.log("  - Update year ranges when files change");
-  }
+  console.log("");
+  console.log("Run `ante fix` to write headers, or `ante check` from a hook or a pipeline.");
 
   return {
     configUpdated,
-    hooksInstalled,
     configPath,
   };
 }
