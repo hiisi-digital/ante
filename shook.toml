@@ -1,0 +1,15 @@
+# What ante wants run on a commit, for `git shook install` to register.
+#
+# ante used to install this itself and take `core.hooksPath` to do it, which
+# silently replaced whatever hook was already there. Declaring it here instead
+# means it runs beside everything else the repository wants rather than in place
+# of it, and that nothing is installed until somebody asks for it.
+#
+# Run from source rather than from a binary called `ante`, because the `ante` on
+# a path is as likely to be the Ante language compiler, which takes the same
+# arguments and does nothing with them.
+
+name = "ante"
+
+[hooks.pre-commit]
+run = ["deno", "run", "-R", "-W", "--allow-run", "--allow-env", "cli/mod.ts", "fix"]
