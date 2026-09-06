@@ -19,10 +19,30 @@
 
 set -eu
 
-deno run -R -W --allow-run --allow-env cli/mod.ts fix
+# Only what was already staged, on both halves.
+#
+# `fix` with no arguments walks everything the config's include and exclude
+# allow, so it rewrote files somebody had deliberately left out of the commit
+# and the re-staging below then swept them in: one commit on this branch
+# carries twenty-four files of header reformatting nobody asked for, under a
+# subject about staging. Its positional arguments are the glob set, so naming
+# the staged paths is the whole fix.
+#
+# And `-z`, because without it git quotes a name with a non-ASCII byte or a
+# control character in it, `caf\303\251.ts` for `café.ts`, and every consumer
+# of that line then works on a path that does not exist. The commit that
+# registered this hook claimed the paths were passed null-separated; they were
+# not, and this is that claim made true.
+staged="$(mktemp)"
+trap 'rm -f "$staged"' EXIT
+git diff --cached -z --name-only --diff-filter=ACM > "$staged"
 
-# Only what was already staged. `git add -u` over the whole tree would sweep in
-# unrelated edits somebody deliberately left out of the commit.
-git diff --cached --name-only --diff-filter=ACM | while IFS= read -r f; do
-	[ -f "$f" ] && git add -- "$f"
-done
+# Nothing staged is not an error, and it is also not a licence to run over the
+# whole tree, which is what an empty argument list would mean to `fix`.
+[ -s "$staged" ] || exit 0
+
+xargs -0 deno run -R -W --allow-run --allow-env cli/mod.ts fix < "$staged"
+
+# `--pathspec-from-file` with the nul flag takes the same list without a shell
+# loop, so a name git had to quote is one git reads back itself.
+git add --pathspec-from-file="$staged" --pathspec-file-nul
