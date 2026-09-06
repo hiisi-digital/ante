@@ -99,11 +99,64 @@ describe("what a run is pointed at", () => {
     // `**/*.rs` matches `empty/notes.rs`, which carries no header, so that run
     // also exits 1. The two reasons are different and this keeps them apart:
     // one file looked at and failing, against no file looked at at all.
-    const config = await loadConfig();
+    //
+    // The include set names rust here, because a positional narrows those
+    // patterns rather than replacing them, and this arm is about the exit code
+    // for a file that was looked at.
+    const config = { ...(await loadConfig()), include: ["**/*.rs"] };
     const rust = await quietly(() => runCheck(config, { glob: "**/*.rs" }));
     assertEquals(rust.totalFiles, 1);
     assertEquals(rust.failedFiles, 1);
+
+    // And the same pattern through the command line, which is the exit code a
+    // hook reads. It is 1 for the other reason: the default include set does
+    // not name rust, a positional narrows rather than replaces, so nothing is
+    // matched at all. Both reasons are 1 and the arm covers both rather than
+    // dropping the half that changed meaning.
     assertEquals(await quietly(() => main(["check", "**/*.rs"])), 1);
+  });
+
+  it("does not act on a path the configuration does not include", async () => {
+    // The pre-commit hook hands over every staged path, and a positional used
+    // to replace the include set, so a staged manifest or readme was acted on
+    // and got a header in whatever `commentPrefix` says rather than in the
+    // comment syntax of its own language. Measured before the fix: one commit
+    // put a `//` block at the top of `deno.json`, `shook.toml`, a markdown
+    // readme and the very shell script git was about to run.
+    //
+    // It is not an error either. A commit stages whatever it stages, and a
+    // manifest among the sources is an ordinary commit; refusing it would put
+    // the hook in the way of every commit that touches one.
+    await writeFile(`${root}/deno.json`, '{\n  "name": "x"\n}\n');
+    assertEquals(await quietly(() => main(["fix", "deno.json"])), 0);
+    assertEquals(
+      await Deno.readTextFile(`${root}/deno.json`),
+      '{\n  "name": "x"\n}\n',
+    );
+
+    // the same list a hook hands over: one file in scope, one out. The one in
+    // scope is acted on and the other is left exactly as it was.
+    await writeFile(`${root}/src/bare.ts`, "export const two = 2;\n");
+    assertEquals(await quietly(() => main(["fix", "deno.json", "src/bare.ts"])), 0);
+    assertStringIncludes(
+      await Deno.readTextFile(`${root}/src/bare.ts`),
+      "SPDX-License-Identifier",
+    );
+    assertEquals(
+      await Deno.readTextFile(`${root}/deno.json`),
+      '{\n  "name": "x"\n}\n',
+    );
+
+    // and a path that is not a file at all is still a typo, and still loud
+    const config = await loadConfig();
+    let thrown: unknown = null;
+    try {
+      await quietly(() => runCheck(config, { glob: "src/nope.ts" }));
+    } catch (error) {
+      thrown = error;
+    }
+    assert(thrown instanceof MatchedNothing);
+    assertEquals(thrown.asked, "src/nope.ts");
   });
 
   it("names the pattern and the configured includes when it matches nothing", async () => {
