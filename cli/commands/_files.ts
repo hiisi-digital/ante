@@ -91,7 +91,8 @@ export class MatchedNothing extends Error {
       `${what}. The configuration includes ${
         include.map((one) => JSON.stringify(one)).join(", ")
       }. ` +
-        `A positional is a glob, or a directory to walk; a path that is neither matches only itself.`,
+        `A positional is a glob, or a directory to walk, and either way it narrows those patterns ` +
+        `rather than replacing them. Use \`ante add\` to put a header on one file regardless.`,
     );
     this.name = "MatchedNothing";
     this.asked = asked;
@@ -105,7 +106,17 @@ export class MatchedNothing extends Error {
  * A directory is walked with the configured include patterns, because
  * `ante check .` and `ante check src` are what a person types: nearly every
  * other checker in the ecosystem takes a path there. Anything else is a glob,
- * matched against the whole tree.
+ * matched against the whole tree and then against those same patterns.
+ *
+ * **Both, not either.** A positional used to replace the include set, so a path
+ * naming anything at all was acted on: `ante fix deno.json` wrote a header into
+ * it, and since the comment prefix is one configured value rather than something
+ * read off the file, the header it wrote was `//` whatever the file's language
+ * used for a comment. The pre-commit hook hands over every staged path, so a
+ * commit staging a manifest, a readme and a shell script had a `//` block put at
+ * the top of all three, and the script it had just broken was the next thing git
+ * ran. Narrowing is what a positional was always meant to do; `add` is the
+ * command that acts on one named file regardless.
  *
  * **All of them, not the first.** Taking one positional and dropping the rest is
  * silent: the command reports success over however many it looked at, and the
@@ -132,26 +143,40 @@ export async function filesToActOn(
   // naming a directory and another naming a file behave the way each would
   // alone. Resolved together, since they do not depend on each other.
   const each = await Promise.all(wanted.map(async (one) => {
-    let directory = false;
+    let kind: "directory" | "file" | "neither" = "neither";
     try {
-      directory = (await Deno.stat(one)).isDirectory;
+      kind = (await Deno.stat(one)).isDirectory ? "directory" : "file";
     } catch {
-      directory = false;
+      kind = "neither";
     }
-    return directory
+    const files = kind === "directory"
       ? await findFilesRecursive(one, config.include, config.exclude)
-      : await findFilesRecursive(".", [one], config.exclude);
+      : (await findFilesRecursive(".", [one], config.exclude))
+        .filter((file) => matchesAnyPattern(file, config.include));
+    return { files, kind };
   }));
 
   // Checked in the order they were given, because a set that is non-empty
   // overall says nothing about the one that matched nothing, and that one is
   // the typo.
-  const empty = wanted.findIndex((_, at) => each[at].length === 0);
+  //
+  // A positional naming a file that exists and is not included is not one,
+  // though, and it is what a hook hands over: a commit stages whatever it
+  // stages, and a manifest among the sources is an ordinary commit rather than
+  // a mistake. That is ante answering that the file is not its business, which
+  // is a different sentence from "nothing matches", so it takes no files and
+  // stops there. A path that is not a file at all still throws, since nothing
+  // but a typo produces one.
+  const empty = wanted.findIndex((_, at) => each[at].files.length === 0 && each[at].kind !== "file");
   if (empty !== -1) throw new MatchedNothing(wanted[empty], config.include);
 
   // Order follows the walk rather than the command line, and a path named twice
   // appears once.
   const all = new Set<string>();
-  for (const found of each) for (const file of found) all.add(file);
+  for (const found of each) for (const file of found.files) all.add(file);
+
+  // Every positional named a file that is out of scope, so the run has nothing
+  // to do and nothing to say about it. A hook handing over a commit of
+  // manifests alone lands here, and it is a pass rather than a refusal.
   return [...all];
 }

@@ -139,6 +139,10 @@ ante add src/new-file.ts   # Add header to a specific file
 ante --help                # Show help
 ```
 
+A directory or a glob narrows the configured include patterns rather than
+replacing them, so a run never touches a file the configuration leaves out of
+scope. `add` is the one that puts a header on a named file regardless.
+
 As project scripts:
 
 ```jsonc
