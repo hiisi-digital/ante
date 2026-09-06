@@ -107,6 +107,13 @@ describe("what a run is pointed at", () => {
     const rust = await quietly(() => runCheck(config, { glob: "**/*.rs" }));
     assertEquals(rust.totalFiles, 1);
     assertEquals(rust.failedFiles, 1);
+
+    // And the same pattern through the command line, which is the exit code a
+    // hook reads. It is 1 for the other reason: the default include set does
+    // not name rust, a positional narrows rather than replaces, so nothing is
+    // matched at all. Both reasons are 1 and the arm covers both rather than
+    // dropping the half that changed meaning.
+    assertEquals(await quietly(() => main(["check", "**/*.rs"])), 1);
   });
 
   it("does not act on a path the configuration does not include", async () => {

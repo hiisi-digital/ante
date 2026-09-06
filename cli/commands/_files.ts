@@ -175,8 +175,9 @@ export async function filesToActOn(
   const all = new Set<string>();
   for (const found of each) for (const file of found.files) all.add(file);
 
-  // Every positional named a file that is out of scope, so the run has nothing
-  // to do and nothing to say about it. A hook handing over a commit of
-  // manifests alone lands here, and it is a pass rather than a refusal.
+  // The ordinary path, and also the empty one. Where every positional named a
+  // file that is out of scope this is empty, so the run has nothing to do and
+  // nothing to say about it: a hook handing over a commit of manifests alone
+  // lands here and it is a pass rather than a refusal.
   return [...all];
 }
