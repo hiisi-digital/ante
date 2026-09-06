@@ -1,8 +1,8 @@
-//----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025-2026                    orgrinrt                    orgrinrt@ikiuni.dev
+//--------------------------------------------------------------------------------------------------
+// Copyright (c) 2025-2026              orgrinrt                 orgrinrt@ikiuni.dev
 //                                      orgrinrt                 ort@hiisi.digital
-// SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
-//----------------------------------------------------------------------------------------------------
+// SPDX-License-Identifier: MPL-2.0     https://mozilla.org/MPL/2.0        ort@hiisi.digital
+//--------------------------------------------------------------------------------------------------
 
 /**
  * The header itself: reading one, writing one, and changing one in place.
@@ -436,6 +436,105 @@ export function hasValidHeader(
 }
 
 /**
+ * The contributors a header will not carry, because the limit is lower than the
+ * number of them.
+ *
+ * `generateHeader` slices to `maxContributors` and says nothing, so a name goes
+ * out of a file with no record anywhere that it was ever there. The limit is
+ * wanted and the silence is not: a caller that asks first can say whose credit
+ * it is about to drop.
+ *
+ * Order is the caller's. Whatever ranked them decided who is kept, and this
+ * reports the tail of that same ranking.
+ *
+ * @param contributors - The contributors in the order they would be written
+ * @param config - The resolved configuration
+ * @returns Those past the limit, in the order they were given, or none
+ */
+export function omittedContributors(
+  contributors: readonly Contributor[],
+  config: ResolvedConfig,
+): Contributor[] {
+  return contributors.slice(config.maxContributors);
+}
+
+/**
+ * How many header blocks sit at the top of a file, back to back.
+ *
+ * One is the ordinary answer and zero means there is no header. Anything above
+ * one is a file that has been written to more than once by something that could
+ * not see what was already there, and it is the shape `ante` itself shipped in
+ * for two versions: `gate.ts` carried two identical blocks and `check` passed it,
+ * because parsing stops at the first closing separator and everything below is
+ * just content.
+ *
+ * Only the run at the top counts. A notice further down the file belongs to
+ * whoever put it there.
+ *
+ * @param content - The file content to count blocks in
+ * @param config - The resolved configuration
+ * @returns The number of header blocks stacked at the top
+ */
+export function stackedHeaders(
+  content: string,
+  config?: ResolvedConfig,
+): number {
+  const line = patterns(config);
+  let lines = content.split("\n");
+  let found = 0;
+
+  while (true) {
+    const parsed = parseHeader(lines.join("\n"), config);
+    if (parsed === null) return found;
+    found++;
+    lines = lines.slice(parsed.endLine);
+    // A blank line between two blocks is what `fix` leaves behind, so the run
+    // continues across them rather than stopping at the first one.
+    while (lines.length > 0 && lines[0].trim() === "") lines = lines.slice(1);
+    if (lines.length === 0 || !line.separator.test(lines[0])) return found;
+  }
+}
+
+/**
+ * The content with any header blocks beyond the first removed.
+ *
+ * Unchanged where there is one block or none, which is nearly always.
+ *
+ * The first is kept because it is the one `parseHeader` reads and the one every
+ * other operation has been acting on, and because a stack is built by prepending,
+ * so the first is the newest. What the extra blocks hold is not merged in: they
+ * are duplicates of the survivor in every case observed, and merging would be
+ * inventing a policy for a shape that should not exist.
+ *
+ * @param content - The file content to collapse
+ * @param config - The resolved configuration
+ * @returns The content with one header block, or exactly what came in
+ */
+export function withoutStackedHeaders(
+  content: string,
+  config?: ResolvedConfig,
+): string {
+  if (stackedHeaders(content, config) < 2) return content;
+
+  const line = patterns(config);
+  const lines = content.split("\n");
+  const first = parseHeader(content, config);
+  if (first === null) return content;
+
+  let at = first.endLine;
+  while (true) {
+    let next = at;
+    while (next < lines.length && lines[next].trim() === "") next++;
+    if (next >= lines.length || !line.separator.test(lines[next])) break;
+    const parsed = parseHeader(lines.slice(next).join("\n"), config);
+    if (parsed === null) break;
+    at = next + parsed.endLine;
+  }
+
+  return [...lines.slice(0, first.endLine), ...lines.slice(at)].join("\n");
+}
+
+/**
  * Validates a header against the configuration.
  *
  * @param content - The file content to validate
@@ -452,6 +551,14 @@ export function validateHeader(
 
   if (!parsed) {
     return { valid: false, issues: ["No valid header found"] };
+  }
+
+  const stacked = stackedHeaders(content, config);
+  if (stacked > 1) {
+    issues.push(
+      `${stacked} header blocks are stacked at the top of the file; ` +
+        `only the first is read, and the rest are content`,
+    );
   }
 
   // Check year is valid

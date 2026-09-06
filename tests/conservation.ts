@@ -11,6 +11,29 @@
  * the same question, so the question lives here rather than twice.
  */
 
+import type { Contributor } from "#core";
+
+/** Names either side of the width at which one overruns its column. */
+const NAMES = [
+  "a",
+  "orgrinrt",
+  "Ada Lovelace",
+  "Jean-Baptiste Grenouille",
+  "A Name That Is Considerably Longer Than Any Column",
+];
+
+/** A cast of contributors, as many as asked for.
+ *
+ * The first few are the shapes that matter, chosen either side of the width at
+ * which a name overruns its column. Past those the names stop being interesting
+ * and only the count is, so they are generated. */
+export function people(count: number): Contributor[] {
+  return Array.from({ length: count }, (_, at) => ({
+    name: NAMES[at] ?? `Person ${at}`,
+    email: `p${at}@example.com`,
+  }));
+}
+
 /** Every address and link in a line, which is what attribution comes down to. */
 export function addresses(line: string): string[] {
   return [...line.matchAll(/\S+@\S+|https?:\/\/\S+/g)].map((one) => one[0].replace(/[.,;]+$/, ""));

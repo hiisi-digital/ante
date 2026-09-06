@@ -1,8 +1,8 @@
-//----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025-2026                    orgrinrt                    orgrinrt@ikiuni.dev
+//--------------------------------------------------------------------------------------------------
+// Copyright (c) 2025-2026              orgrinrt                 orgrinrt@ikiuni.dev
 //                                      orgrinrt                 ort@hiisi.digital
-// SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
-//----------------------------------------------------------------------------------------------------
+// SPDX-License-Identifier: MPL-2.0     https://mozilla.org/MPL/2.0        ort@hiisi.digital
+//--------------------------------------------------------------------------------------------------
 
 /**
  * CLI command: check
@@ -20,7 +20,8 @@ import { filesToActOn } from "./_files.ts";
  */
 interface CheckOptions {
   /** Glob pattern to filter files (overrides config.include) */
-  glob?: string;
+  /** The positionals, each a path, a directory or a glob. */
+  glob?: string | readonly string[];
   /** Show verbose output */
   verbose?: boolean;
   /** Output format: "human" for readable, "json" for machine-parseable */

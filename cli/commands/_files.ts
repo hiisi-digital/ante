@@ -100,39 +100,58 @@ export class MatchedNothing extends Error {
 }
 
 /**
- * The files a command should act on, given the positional it was handed.
+ * The files a command should act on, given the positionals it was handed.
  *
  * A directory is walked with the configured include patterns, because
  * `ante check .` and `ante check src` are what a person types: nearly every
  * other checker in the ecosystem takes a path there. Anything else is a glob,
  * matched against the whole tree.
  *
- * Throws {@linkcode MatchedNothing} rather than returning an empty list.
+ * **All of them, not the first.** Taking one positional and dropping the rest is
+ * silent: the command reports success over however many it looked at, and the
+ * ones it never opened are indistinguishable from ones that passed. The
+ * pre-commit hook hands over every staged path at once, so a commit touching
+ * three files had two of them go unheadered while the hook printed success.
+ *
+ * Throws {@linkcode MatchedNothing} rather than returning an empty list, naming
+ * whichever positional matched nothing rather than reporting the set as empty.
  */
 export async function filesToActOn(
   config: { include: string[]; exclude: string[] },
-  asked?: string,
+  asked?: string | readonly string[],
 ): Promise<string[]> {
-  let root = ".";
-  let include = config.include;
+  const wanted = asked === undefined ? [] : (typeof asked === "string" ? [asked] : [...asked]);
 
-  if (asked !== undefined) {
+  if (wanted.length === 0) {
+    const found = await findFilesRecursive(".", config.include, config.exclude);
+    if (found.length === 0) throw new MatchedNothing(undefined, config.include);
+    return found;
+  }
+
+  // Each positional is resolved on its own and the results are unioned, so one
+  // naming a directory and another naming a file behave the way each would
+  // alone. Resolved together, since they do not depend on each other.
+  const each = await Promise.all(wanted.map(async (one) => {
     let directory = false;
     try {
-      directory = (await Deno.stat(asked)).isDirectory;
+      directory = (await Deno.stat(one)).isDirectory;
     } catch {
       directory = false;
     }
-    if (directory) {
-      root = asked;
-    } else {
-      include = [asked];
-    }
-  }
+    return directory
+      ? await findFilesRecursive(one, config.include, config.exclude)
+      : await findFilesRecursive(".", [one], config.exclude);
+  }));
 
-  const found = await findFilesRecursive(root, include, config.exclude);
-  if (found.length === 0) {
-    throw new MatchedNothing(asked, config.include);
-  }
-  return found;
+  // Checked in the order they were given, because a set that is non-empty
+  // overall says nothing about the one that matched nothing, and that one is
+  // the typo.
+  const empty = wanted.findIndex((_, at) => each[at].length === 0);
+  if (empty !== -1) throw new MatchedNothing(wanted[empty], config.include);
+
+  // Order follows the walk rather than the command line, and a path named twice
+  // appears once.
+  const all = new Set<string>();
+  for (const found of each) for (const file of found) all.add(file);
+  return [...all];
 }
