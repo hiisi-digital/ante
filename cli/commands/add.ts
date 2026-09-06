@@ -1,8 +1,8 @@
-//----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025-2026                    orgrinrt                    orgrinrt@ikiuni.dev
+//--------------------------------------------------------------------------------------------------
+// Copyright (c) 2025-2026              orgrinrt                 orgrinrt@ikiuni.dev
 //                                      orgrinrt                 ort@hiisi.digital
-// SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
-//----------------------------------------------------------------------------------------------------
+// SPDX-License-Identifier: MPL-2.0     https://mozilla.org/MPL/2.0        ort@hiisi.digital
+//--------------------------------------------------------------------------------------------------
 
 /**
  * CLI command: add
@@ -47,11 +47,11 @@ export async function add(options: AddOptions, config: ResolvedConfig): Promise<
   try {
     const stat = await Deno.stat(file);
     if (!stat.isFile) {
-      console.error(`Error: ${file} is not a file`);
+      console.error(`${file} is not a file`);
       return 1;
     }
   } catch {
-    console.error(`Error: File not found: ${file}`);
+    console.error(`no file at ${file}`);
     return 1;
   }
 
@@ -61,7 +61,7 @@ export async function add(options: AddOptions, config: ResolvedConfig): Promise<
     content = await Deno.readTextFile(file);
   } catch (error) {
     console.error(
-      `Error reading file: ${error instanceof Error ? error.message : error}`,
+      `could not read the file: ${error instanceof Error ? error.message : error}`,
     );
     return 1;
   }
@@ -82,7 +82,8 @@ export async function add(options: AddOptions, config: ResolvedConfig): Promise<
   const currentUser = await getCurrentGitUser();
   if (!currentUser) {
     console.error(
-      "Error: Could not determine git user. Please configure git user.name and user.email",
+      "no git user to credit. Set git user.name and user.email, or name the\n" +
+        "contributors in the config",
     );
     return 1;
   }
@@ -135,7 +136,7 @@ export async function add(options: AddOptions, config: ResolvedConfig): Promise<
     return 0;
   } catch (error) {
     console.error(
-      `Error writing file: ${error instanceof Error ? error.message : error}`,
+      `could not write the file: ${error instanceof Error ? error.message : error}`,
     );
     return 1;
   }

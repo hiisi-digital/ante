@@ -26,6 +26,7 @@
 import { assertEquals } from "@std/assert";
 import { describe, it } from "@std/testing/bdd";
 import { type Contributor, DEFAULT_CONFIG, parseHeader, rewriteHeader } from "#core";
+import { CATALOGUED } from "./catalogued.ts";
 import { destroyed } from "./conservation.ts";
 import type { ResolvedConfig } from "#core";
 
@@ -126,12 +127,15 @@ describe("a header somebody else wrote", () => {
     // today. Filed as `ante-restates-a-foreign-licence`, and the assertion
     // below is what green looks like whichever of the four is chosen, since
     // all but the last leave the declaration where it was.
-    ignore: true,
+    ignore: !CATALOGUED,
     fn: () => {
-      const foreign = CORPUS.filter((one) => /SPDX-License-Identifier:\s*ISC/i.test(one.block));
-      const restated = foreign.filter((one) => {
+      // The whole class, by the same instrument the count above uses. Matching
+      // on `ISC` covered 22 of the 98; the other 76 declare Apache-2.0 and a fix
+      // scoped to the first spelling would have turned this green with three
+      // quarters of the disclosed class still broken.
+      const restated = CORPUS.filter((one) => {
         const after = rewriteHeader(adopted(one.block, CONFIG), CONFIG, WHO, 2020, 2026);
-        return !after.includes("SPDX-License-Identifier: ISC");
+        return destroyed(one.block.split("\n"), after, KEEPS).some(declaresLicence);
       });
 
       assertEquals(restated.map((one) => one.id), []);

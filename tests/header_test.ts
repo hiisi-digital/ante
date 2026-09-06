@@ -1,22 +1,27 @@
-//----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025-2026                    orgrinrt                    orgrinrt@ikiuni.dev
+//--------------------------------------------------------------------------------------------------
+// Copyright (c) 2025-2026              orgrinrt                 orgrinrt@ikiuni.dev
 //                                      orgrinrt                 ort@hiisi.digital
-// SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
-//----------------------------------------------------------------------------------------------------
+// SPDX-License-Identifier: MPL-2.0     https://mozilla.org/MPL/2.0        ort@hiisi.digital
+//--------------------------------------------------------------------------------------------------
 
 import {
   generateHeader,
   getYearRange,
   hasContributor,
   hasValidHeader,
+  omittedContributors,
   parseHeader,
   replaceHeader,
+  stackedHeaders,
   updateHeader,
   validateHeader,
+  withoutStackedHeaders,
 } from "#core";
-import { assertEquals } from "@std/assert";
+import { assertEquals, assertStringIncludes } from "@std/assert";
 import { describe, it } from "@std/testing/bdd";
 import { DEFAULT_CONFIG } from "../core/config.generated.ts";
+import { CATALOGUED } from "./catalogued.ts";
+import { people } from "./conservation.ts";
 
 const SAMPLE_HEADER =
   `//----------------------------------------------------------------------------------------------------
@@ -355,7 +360,7 @@ describe("a header written with no licence configured", () => {
 
   it({
     name: "does not certify a header whose licence is blank (ante-blank-licence-certified)",
-    ignore: true,
+    ignore: !CATALOGUED,
     fn(): void {
       // Catalogued rather than fixed. `validateHeader` skips the comparison
       // entirely when the configured licence is empty, so the same guard means
@@ -406,5 +411,146 @@ describe("a header written before the gap was widened", () => {
     assertEquals(parsed?.spdxLicense, "MIT");
     assertEquals(parsed?.licenseUrl, "https://opensource.org/licenses/MIT");
     assertEquals(parsed?.maintainerEmail, "c@x.dev");
+  });
+});
+
+describe("a header written twice over the same file", () => {
+  const block = [
+    "//" + "-".repeat(98),
+    "// Copyright (c) 2026                   orgrinrt                 ort@hiisi.digital",
+    "// SPDX-License-Identifier: MPL-2.0     https://mozilla.org/MPL/2.0        ort@hiisi.digital",
+    "//" + "-".repeat(98),
+  ].join("\n");
+  const body = "\nexport const x = 1;\n";
+
+  it("is counted, where one block and none are counted too", () => {
+    assertEquals(stackedHeaders(block + "\n" + body, DEFAULT_CONFIG), 1);
+    assertEquals(stackedHeaders(body.trimStart(), DEFAULT_CONFIG), 0);
+    assertEquals(stackedHeaders(block + "\n\n" + block + "\n" + body, DEFAULT_CONFIG), 2);
+    assertEquals(
+      stackedHeaders(block + "\n\n" + block + "\n\n" + block + "\n" + body, DEFAULT_CONFIG),
+      3,
+    );
+  });
+
+  it("counts across the blank line fix leaves between them, and stops at real content", () => {
+    // No blank line at all is still two blocks back to back.
+    assertEquals(stackedHeaders(block + "\n" + block + "\n" + body, DEFAULT_CONFIG), 2);
+    // A block further down the file belongs to whoever put it there, so the run
+    // ends at the first line that is neither blank nor a separator.
+    assertEquals(
+      stackedHeaders(block + "\n\nconst a = 1;\n\n" + block + "\n", DEFAULT_CONFIG),
+      1,
+    );
+  });
+
+  it("fails validation, which is what check reads", () => {
+    const one = validateHeader(block + "\n" + body, DEFAULT_CONFIG);
+    assertEquals(one.valid, true, "one block is the ordinary case and stays valid");
+
+    const two = validateHeader(block + "\n\n" + block + "\n" + body, DEFAULT_CONFIG);
+    assertEquals(two.valid, false);
+    assertEquals(
+      two.issues.some((i) => i.includes("2 header blocks are stacked")),
+      true,
+      `the issue names the count, and said: ${JSON.stringify(two.issues)}`,
+    );
+  });
+
+  it("is invisible to parseHeader, which is why validate has to ask", () => {
+    // Stated as a test rather than a comment, because it is the reason the
+    // defect survived two releases: parsing stops at the first closing
+    // separator, so a file with two blocks parses exactly like a file with one.
+    const one = parseHeader(block + "\n" + body, DEFAULT_CONFIG);
+    const two = parseHeader(block + "\n\n" + block + "\n" + body, DEFAULT_CONFIG);
+    assertEquals(two?.endLine, one?.endLine);
+    assertEquals(hasValidHeader(block + "\n\n" + block + "\n" + body, DEFAULT_CONFIG), true);
+  });
+});
+
+describe("the names a header will not carry", () => {
+  it("is empty while the limit has room, and names the tail once it does not", () => {
+    const config = { ...DEFAULT_CONFIG, maxContributors: 3 };
+    assertEquals(omittedContributors(people(0), config), []);
+    assertEquals(omittedContributors(people(3), config), []);
+    assertEquals(
+      omittedContributors(people(5), config).map((c) => c.name),
+      people(5).slice(3).map((c) => c.name),
+    );
+  });
+
+  it("names exactly who the header leaves out, at any limit", () => {
+    // Tied to what `generateHeader` actually writes rather than to the slice, so
+    // the two cannot drift into disagreeing about who was dropped.
+    for (const limit of [1, 2, 3, 7]) {
+      for (const count of [0, 1, 3, 5, 9]) {
+        const config = { ...DEFAULT_CONFIG, maxContributors: limit };
+        const who = people(count);
+        const written = generateHeader(config, who, 2026, 2026);
+        const parsed = parseHeader(written, config);
+        const kept = parsed?.contributors.map((c) => c.name) ?? [];
+        const left = omittedContributors(who, config).map((c) => c.name);
+
+        assertEquals(
+          [...kept, ...left].length,
+          count,
+          `limit=${limit} people=${count}: kept ${kept.length} and left ${left.length}`,
+        );
+        assertEquals(
+          left,
+          who.slice(kept.length).map((c) => c.name),
+          `limit=${limit} people=${count}: the tail has to be the ones not written`,
+        );
+      }
+    }
+  });
+});
+
+describe("collapsing a stack of header blocks", () => {
+  const block = [
+    "//" + "-".repeat(98),
+    "// Copyright (c) 2026                   orgrinrt                 ort@hiisi.digital",
+    "// SPDX-License-Identifier: MPL-2.0     https://mozilla.org/MPL/2.0        ort@hiisi.digital",
+    "//" + "-".repeat(98),
+  ].join("\n");
+  const body = "\nexport const x = 1;\n";
+
+  it("leaves alone what has one block or none", () => {
+    const one = block + "\n" + body;
+    assertEquals(withoutStackedHeaders(one, DEFAULT_CONFIG), one);
+    assertEquals(withoutStackedHeaders(body, DEFAULT_CONFIG), body);
+  });
+
+  it("takes a stack down to one, at any depth and with or without blank lines", () => {
+    for (const gap of ["\n", "\n\n", "\n\n\n"]) {
+      for (const depth of [2, 3, 5]) {
+        const stacked = Array(depth).fill(block).join(gap) + "\n" + body;
+        const flat = withoutStackedHeaders(stacked, DEFAULT_CONFIG);
+
+        assertEquals(
+          stackedHeaders(flat, DEFAULT_CONFIG),
+          1,
+          `depth=${depth} gap=${JSON.stringify(gap)} did not come down to one`,
+        );
+        assertEquals(
+          validateHeader(flat, DEFAULT_CONFIG).valid,
+          true,
+          "and what fix leaves has to be what check accepts",
+        );
+        // The body survives, which is the thing a collapse could quietly eat.
+        assertStringIncludes(flat, "export const x = 1;");
+      }
+    }
+  });
+
+  it("keeps a block further down the file, which is somebody else's", () => {
+    const mine = block + "\n\n" + block + "\n\nconst a = 1;\n\n" + block + "\n";
+    const flat = withoutStackedHeaders(mine, DEFAULT_CONFIG);
+    assertEquals(stackedHeaders(flat, DEFAULT_CONFIG), 1);
+    assertEquals(
+      flat.split("\n").filter((l) => /^\/\/-+$/.test(l)).length,
+      4,
+      "the one at the top collapsed to a single block, and the one below stayed",
+    );
   });
 });

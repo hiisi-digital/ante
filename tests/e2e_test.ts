@@ -1,8 +1,8 @@
-//----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025-2026                    orgrinrt                    orgrinrt@ikiuni.dev
+//--------------------------------------------------------------------------------------------------
+// Copyright (c) 2025-2026              orgrinrt                 orgrinrt@ikiuni.dev
 //                                      orgrinrt                 ort@hiisi.digital
-// SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
-//----------------------------------------------------------------------------------------------------
+// SPDX-License-Identifier: MPL-2.0     https://mozilla.org/MPL/2.0        ort@hiisi.digital
+//--------------------------------------------------------------------------------------------------
 
 /**
  * End-to-end integration tests for ante.
@@ -606,6 +606,20 @@ describe("E2E: Edge Cases", () => {
   });
 
   it("should put the header above a rust inner attribute", async () => {
+    // A positional narrows the include set rather than replacing it, so a rust
+    // crate says it is a rust crate. That is what an `ante.toml` on one does,
+    // and this test is about where the header lands rather than about which
+    // files a run walks.
+    await writeFile(
+      join(env.rootDir, "deno.json"),
+      JSON.stringify({
+        ...TEST_DENO_JSON,
+        ante: {
+          ...TEST_DENO_JSON.ante,
+          include: [...TEST_DENO_JSON.ante.include, "**/*.rs"],
+        },
+      }, null, 2),
+    );
     await writeFile(
       join(env.rootDir, "src/lib.rs"),
       `#![no_std]\n\npub fn f() {}\n`,

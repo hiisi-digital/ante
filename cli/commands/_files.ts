@@ -91,7 +91,8 @@ export class MatchedNothing extends Error {
       `${what}. The configuration includes ${
         include.map((one) => JSON.stringify(one)).join(", ")
       }. ` +
-        `A positional is a glob, or a directory to walk; a path that is neither matches only itself.`,
+        `A positional is a glob, or a directory to walk, and either way it narrows those patterns ` +
+        `rather than replacing them. Use \`ante add\` to put a header on one file regardless.`,
     );
     this.name = "MatchedNothing";
     this.asked = asked;
@@ -100,39 +101,83 @@ export class MatchedNothing extends Error {
 }
 
 /**
- * The files a command should act on, given the positional it was handed.
+ * The files a command should act on, given the positionals it was handed.
  *
  * A directory is walked with the configured include patterns, because
  * `ante check .` and `ante check src` are what a person types: nearly every
  * other checker in the ecosystem takes a path there. Anything else is a glob,
- * matched against the whole tree.
+ * matched against the whole tree and then against those same patterns.
  *
- * Throws {@linkcode MatchedNothing} rather than returning an empty list.
+ * **Both, not either.** A positional used to replace the include set, so a path
+ * naming anything at all was acted on: `ante fix deno.json` wrote a header into
+ * it, and since the comment prefix is one configured value rather than something
+ * read off the file, the header it wrote was `//` whatever the file's language
+ * used for a comment. The pre-commit hook hands over every staged path, so a
+ * commit staging a manifest, a readme and a shell script had a `//` block put at
+ * the top of all three, and the script it had just broken was the next thing git
+ * ran. Narrowing is what a positional was always meant to do; `add` is the
+ * command that acts on one named file regardless.
+ *
+ * **All of them, not the first.** Taking one positional and dropping the rest is
+ * silent: the command reports success over however many it looked at, and the
+ * ones it never opened are indistinguishable from ones that passed. The
+ * pre-commit hook hands over every staged path at once, so a commit touching
+ * three files had two of them go unheadered while the hook printed success.
+ *
+ * Throws {@linkcode MatchedNothing} rather than returning an empty list, naming
+ * whichever positional matched nothing rather than reporting the set as empty.
  */
 export async function filesToActOn(
   config: { include: string[]; exclude: string[] },
-  asked?: string,
+  asked?: string | readonly string[],
 ): Promise<string[]> {
-  let root = ".";
-  let include = config.include;
+  const wanted = asked === undefined ? [] : (typeof asked === "string" ? [asked] : [...asked]);
 
-  if (asked !== undefined) {
-    let directory = false;
+  if (wanted.length === 0) {
+    const found = await findFilesRecursive(".", config.include, config.exclude);
+    if (found.length === 0) throw new MatchedNothing(undefined, config.include);
+    return found;
+  }
+
+  // Each positional is resolved on its own and the results are unioned, so one
+  // naming a directory and another naming a file behave the way each would
+  // alone. Resolved together, since they do not depend on each other.
+  const each = await Promise.all(wanted.map(async (one) => {
+    let kind: "directory" | "file" | "neither" = "neither";
     try {
-      directory = (await Deno.stat(asked)).isDirectory;
+      kind = (await Deno.stat(one)).isDirectory ? "directory" : "file";
     } catch {
-      directory = false;
+      kind = "neither";
     }
-    if (directory) {
-      root = asked;
-    } else {
-      include = [asked];
-    }
-  }
+    const files = kind === "directory"
+      ? await findFilesRecursive(one, config.include, config.exclude)
+      : (await findFilesRecursive(".", [one], config.exclude))
+        .filter((file) => matchesAnyPattern(file, config.include));
+    return { files, kind };
+  }));
 
-  const found = await findFilesRecursive(root, include, config.exclude);
-  if (found.length === 0) {
-    throw new MatchedNothing(asked, config.include);
-  }
-  return found;
+  // Checked in the order they were given, because a set that is non-empty
+  // overall says nothing about the one that matched nothing, and that one is
+  // the typo.
+  //
+  // A positional naming a file that exists and is not included is not one,
+  // though, and it is what a hook hands over: a commit stages whatever it
+  // stages, and a manifest among the sources is an ordinary commit rather than
+  // a mistake. That is ante answering that the file is not its business, which
+  // is a different sentence from "nothing matches", so it takes no files and
+  // stops there. A path that is not a file at all still throws, since nothing
+  // but a typo produces one.
+  const empty = wanted.findIndex((_, at) => each[at].files.length === 0 && each[at].kind !== "file");
+  if (empty !== -1) throw new MatchedNothing(wanted[empty], config.include);
+
+  // Order follows the walk rather than the command line, and a path named twice
+  // appears once.
+  const all = new Set<string>();
+  for (const found of each) for (const file of found.files) all.add(file);
+
+  // The ordinary path, and also the empty one. Where every positional named a
+  // file that is out of scope this is empty, so the run has nothing to do and
+  // nothing to say about it: a hook handing over a commit of manifests alone
+  // lands here and it is a pass rather than a refusal.
+  return [...all];
 }

@@ -33,7 +33,6 @@
         "explicit-function-return-type",
         "explicit-module-boundary-types",
         "no-await-in-loop",
-        "no-console",
         "no-const-assign",
         "no-eval",
         "no-implicit-declare-namespace-export",
@@ -76,7 +75,8 @@
     "prepublish": "deno task all && deno task test:node",
     "codegen": "deno run --allow-read --allow-write scripts/codegen.ts",
     "build:npm": "deno run -A scripts/build-npm.ts",
-    "test:node": "deno task build:npm && node tests/node/smoke.mjs && node tests/node/git.mjs && npx --yes tsx tests/node/types.ts"
+    "test:catalogued": "ANTE_CATALOGUED=1 deno test --allow-all --no-check",
+    "test:node": "deno task build:npm && node tests/node/smoke.mjs && node tests/node/git.mjs && node tests/node/types.mjs"
   },
   "publish": {
     "include": [
@@ -91,7 +91,6 @@
       "core/run.ts",
       "core/version.ts",
       "git/mod.ts",
-      "git/hooks.ts",
       "git/history.ts",
       "cli/mod.ts",
       "cli/commands/_files.ts",
@@ -105,8 +104,7 @@
     ],
     "exclude": [
       "tests/",
-      "scripts/",
-      ".githooks/"
+      "scripts/"
     ]
   },
   "ante": {
@@ -114,7 +112,8 @@
     "maxContributors": 3,
     "contributorSelection": "commits",
     "spdxLicense": "MPL-2.0",
-    "licenseUrl": "https://mozilla.org/MPL/2.0"
+    "licenseUrl": "https://mozilla.org/MPL/2.0",
+    "exclude": ["npm/**", "coverage/**", "docs/**"]
   },
   "minimumDependencyAge": 0
 }
