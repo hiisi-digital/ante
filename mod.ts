@@ -1,14 +1,19 @@
-//----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
-// SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
-//----------------------------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
+// Copyright (c) 2025-2026              orgrinrt                 orgrinrt@ikiuni.dev
+//                                      orgrinrt                 ort@hiisi.digital
+// SPDX-License-Identifier: MPL-2.0     https://mozilla.org/MPL/2.0        ort@hiisi.digital
+//--------------------------------------------------------------------------------------------------
 
 /**
- * @module ante
+ * Copyright headers, derived rather than typed in.
  *
- * A tool for managing copyright headers in source files.
- * Provides both a library API and CLI for checking, fixing, and maintaining
- * standardized copyright headers across your codebase.
+ * `ante` keeps the header at the top of a source file current: the year range,
+ * the contributor list and the SPDX identifier all come from the repository and
+ * the configuration, and are re-derived whenever the file changes. The command
+ * line tool and this library are the same code, so anything `ante fix` does is
+ * reachable a function at a time.
+ *
+ * @module
  */
 
 // Re-export public API

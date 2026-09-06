@@ -1,14 +1,18 @@
-//----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+//--------------------------------------------------------------------------------------------------
+// Copyright (c) 2025-2026              orgrinrt                 orgrinrt@ikiuni.dev
 //                                      orgrinrt                 ort@hiisi.digital
-// SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
-//----------------------------------------------------------------------------------------------------
+// SPDX-License-Identifier: MPL-2.0     https://mozilla.org/MPL/2.0        ort@hiisi.digital
+//--------------------------------------------------------------------------------------------------
 
 /**
- * Glob pattern matching utilities.
+ * Glob matching, for the include and exclude lists.
  *
- * Provides functions for matching file paths against glob patterns,
- * supporting common glob syntax like single asterisk and double asterisk (globstar).
+ * `*` stops at a path separator and `**` crosses them, `?` is one character that
+ * is not a separator. That is the whole vocabulary. A brace or a bracket is
+ * escaped and matches itself, so a pattern borrowed from a shell does not half
+ * work here, it matches a path with those characters literally in it.
+ *
+ * @module
  */
 
 /**

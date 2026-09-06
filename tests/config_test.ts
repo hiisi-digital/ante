@@ -1,22 +1,41 @@
-//----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
-// SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
-//----------------------------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
+// Copyright (c) 2025-2026              orgrinrt                 orgrinrt@ikiuni.dev
+//                                      orgrinrt                 ort@hiisi.digital
+// SPDX-License-Identifier: MPL-2.0     https://mozilla.org/MPL/2.0        ort@hiisi.digital
+//--------------------------------------------------------------------------------------------------
 
-import { deriveLicenseUrl, resolveConfig } from "#core";
-import { assertEquals } from "@std/assert";
+import { CONFIG_BOUNDS, deriveLicenseUrl, resolveConfig } from "#core";
+import { assertEquals, assertThrows } from "@std/assert";
 import { describe, it } from "@std/testing/bdd";
 import { DEFAULT_CONFIG } from "../core/config.generated.ts";
 
 describe("DEFAULT_CONFIG", () => {
-  it("should have sensible defaults", () => {
-    assertEquals(DEFAULT_CONFIG.width, 100);
-    assertEquals(DEFAULT_CONFIG.separatorChar, "-");
-    assertEquals(DEFAULT_CONFIG.commentPrefix, "//");
-    assertEquals(DEFAULT_CONFIG.nameColumn, 40);
-    assertEquals(DEFAULT_CONFIG.emailColumn, 65);
-    assertEquals(DEFAULT_CONFIG.maxContributors, 3);
-    assertEquals(DEFAULT_CONFIG.contributorSelection, "commits");
+  it("carries every default the schema declares", async () => {
+    // This used to compare the generated constants against the same numbers
+    // typed out again, which is the schema checked against a copy of itself.
+    // Reading the schema is the same test with the copy removed, and it is the
+    // one that notices when codegen and the schema part company.
+    const schema = JSON.parse(
+      await Deno.readTextFile(
+        new URL("../schema/config.schema.json", import.meta.url),
+      ),
+    ) as { properties: Record<string, { default?: unknown }> };
+
+    const declared = Object.entries(schema.properties)
+      .filter(([, one]) => one.default !== undefined && one.default !== null);
+    assertEquals(
+      declared.length > 5,
+      true,
+      `the schema should declare defaults, found ${declared.length}`,
+    );
+
+    for (const [key, one] of declared) {
+      assertEquals(
+        (DEFAULT_CONFIG as Record<string, unknown>)[key],
+        one.default,
+        `DEFAULT_CONFIG.${key} does not match the schema`,
+      );
+    }
   });
 
   it("should have default include patterns for TypeScript", () => {
@@ -81,6 +100,69 @@ describe("resolveConfig", () => {
       manualContributors: [],
     });
     assertEquals(resolved.manualContributors, []);
+  });
+});
+
+describe("the ranges the schema declares", () => {
+  it("refuses every bounded option below its minimum and above its maximum", () => {
+    // Every one of them, rather than a sample. Picking which options to check is
+    // picking which ones nobody finds out about, and the loop costs nothing.
+    for (const [key, { min, max }] of Object.entries(CONFIG_BOUNDS)) {
+      assertThrows(
+        () => resolveConfig({ [key]: min - 1 }),
+        Error,
+        key,
+        `${key} at ${min - 1} went through, and its floor is ${min}`,
+      );
+      assertThrows(
+        () => resolveConfig({ [key]: max + 1 }),
+        Error,
+        key,
+        `${key} at ${max + 1} went through, and its ceiling is ${max}`,
+      );
+    }
+  });
+
+  it("takes both ends of every range, so the refusal is exclusive", () => {
+    for (const [key, { min, max }] of Object.entries(CONFIG_BOUNDS)) {
+      assertEquals(
+        (resolveConfig({ [key]: min }) as Record<string, unknown>)[key],
+        min,
+      );
+      assertEquals(
+        (resolveConfig({ [key]: max }) as Record<string, unknown>)[key],
+        max,
+      );
+    }
+  });
+
+  it("names the option, the value it got and the range it wanted", () => {
+    // A message saying only that the config is wrong sends the reader back to
+    // the schema to work out which line of theirs it meant.
+    assertThrows(
+      () => resolveConfig({ width: 3 }),
+      Error,
+      "ante config: width is 3, and it has to be between 60 and 200.",
+    );
+  });
+
+  it("refuses a bounded option that is not a number at all", () => {
+    // TOML and JSON both hand back whatever was written, and a quoted number is
+    // the ordinary way to get a string into one of these.
+    for (const wrong of ["100", null, undefined, NaN, Infinity]) {
+      assertThrows(
+        () => resolveConfig({ width: wrong as unknown as number }),
+        Error,
+        "width",
+      );
+    }
+  });
+
+  it("leaves an unbounded option alone", () => {
+    // The loop reads a table rather than every key, so an option with no range
+    // must not acquire one by accident.
+    assertEquals(CONFIG_BOUNDS.separatorChar, undefined);
+    assertEquals(resolveConfig({ separatorChar: "=" }).separatorChar, "=");
   });
 });
 

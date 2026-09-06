@@ -1,12 +1,17 @@
-//----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
-// SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
-//----------------------------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
+// Copyright (c) 2025-2026              orgrinrt                 orgrinrt@ikiuni.dev
+//                                      orgrinrt                 ort@hiisi.digital
+// SPDX-License-Identifier: MPL-2.0     https://mozilla.org/MPL/2.0        ort@hiisi.digital
+//--------------------------------------------------------------------------------------------------
 
 /**
- * Formatting utilities for copyright headers.
+ * Putting text at a column, which is what makes a header line up.
  *
- * Provides functions for column-aligned text formatting used in headers.
+ * Columns are positions rather than widths, and content that overruns the next
+ * one is not truncated: it pushes across, keeping the gap that separates two
+ * fields, so a long name breaks the alignment of that line and nothing else.
+ *
+ * @module
  */
 
 import type { ResolvedConfig } from "./config.ts";
@@ -22,9 +27,20 @@ export interface Column {
 }
 
 /**
+ * The narrowest run of spaces that still separates two fields.
+ *
+ * Columns are the intent and this is the floor, for a line whose content
+ * overruns the column the next field was meant to start at. The parser takes any
+ * run of whitespace, so this is what keeps such a line legible, not what keeps
+ * it readable back.
+ */
+const MINIMUM_GAP = 2;
+
+/**
  * Formats a line with content aligned to specified column positions.
  * Content is placed at each column position, with spaces filling gaps.
- * If content overlaps the next column, a single space is used as minimum separator.
+ * Content that overruns the next column pushes it across, keeping the minimum
+ * gap that separates two fields.
  *
  * @param columns - Array of column definitions, should be sorted by position
  * @returns The formatted line string
@@ -44,13 +60,14 @@ export function formatLine(columns: Column[]): string {
     // Calculate padding needed to reach column position
     const paddingNeeded = col.position - currentPos;
 
-    if (paddingNeeded > 0) {
+    if (paddingNeeded >= MINIMUM_GAP) {
       result += " ".repeat(paddingNeeded);
       currentPos += paddingNeeded;
-    } else if (currentPos > 0 && paddingNeeded <= 0) {
-      // Content overlaps, add minimum single space
-      result += " ";
-      currentPos += 1;
+    } else if (currentPos > 0) {
+      // The content before this one ran past where this one starts, so the
+      // column is gone and the gap is all that is left of it.
+      result += " ".repeat(MINIMUM_GAP);
+      currentPos += MINIMUM_GAP;
     }
 
     result += col.content;
@@ -81,7 +98,11 @@ export function generateSeparator(
 }
 
 /**
- * Pads text with spaces to reach the target column position.
+ * Pads text with spaces so what follows it starts at the target column.
+ *
+ * Text already reaching the column pushes across, keeping the same minimum gap
+ * {@link formatLine} keeps, so a line built out of these reads back the same way
+ * as one built out of that.
  *
  * @param text - The text to pad
  * @param targetColumn - The target column position
@@ -89,7 +110,7 @@ export function generateSeparator(
  */
 export function padToColumn(text: string, targetColumn: number): string {
   if (text.length >= targetColumn) {
-    return text + " "; // Minimum one space
+    return text + " ".repeat(MINIMUM_GAP);
   }
   return text + " ".repeat(targetColumn - text.length);
 }

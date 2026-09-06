@@ -1,9 +1,12 @@
 {
   "name": "@hiisi/ante",
-  "version": "0.1.7",
-  "description": "Manage copyright headers in your source files. Check, fix, and keep them consistent.",
+  "version": "0.3.0",
+  "description": "Copyright headers as a maintained artifact. Checked, fixed and kept consistent across a whole tree.",
   "license": "MPL-2.0",
-  "exports": "./mod.ts",
+  "exports": {
+    ".": "./mod.ts",
+    "./cli": "./cli/mod.ts"
+  },
   "imports": {
     "@std/fs": "jsr:@std/fs@^1.0.0",
     "@std/path": "jsr:@std/path@^1.0.0",
@@ -30,7 +33,6 @@
         "explicit-function-return-type",
         "explicit-module-boundary-types",
         "no-await-in-loop",
-        "no-console",
         "no-const-assign",
         "no-eval",
         "no-implicit-declare-namespace-export",
@@ -64,15 +66,17 @@
     "test": "deno test --allow-read --allow-write --allow-env --allow-run",
     "test:watch": "deno test --allow-read --allow-write --allow-env --allow-run --watch",
     "test:coverage": "deno test --allow-read --allow-write --allow-env --allow-run --coverage=coverage/",
-    "lint": "deno lint",
+    "lint": "deno run -A --config gate.json gate.ts",
     "lint:fix": "deno lint --fix",
     "fmt": "deno fmt",
     "fmt:check": "deno fmt --check",
     "check": "deno check mod.ts",
     "all": "deno task fmt && deno task lint && deno task check && deno task test",
-    "prepublish": "deno task all",
+    "prepublish": "deno task all && deno task test:node",
     "codegen": "deno run --allow-read --allow-write scripts/codegen.ts",
-    "build:npm": "deno run -A scripts/build-npm.ts"
+    "build:npm": "deno run -A scripts/build-npm.ts",
+    "test:catalogued": "ANTE_CATALOGUED=1 deno test --allow-all --no-check",
+    "test:node": "deno task build:npm && node tests/node/smoke.mjs && node tests/node/git.mjs && node tests/node/types.mjs"
   },
   "publish": {
     "include": [
@@ -84,11 +88,12 @@
       "core/formatter.ts",
       "core/glob.ts",
       "core/header.ts",
+      "core/run.ts",
       "core/version.ts",
       "git/mod.ts",
-      "git/hooks.ts",
       "git/history.ts",
       "cli/mod.ts",
+      "cli/commands/_files.ts",
       "cli/commands/init.ts",
       "cli/commands/check.ts",
       "cli/commands/fix.ts",
@@ -99,8 +104,7 @@
     ],
     "exclude": [
       "tests/",
-      "scripts/",
-      ".githooks/"
+      "scripts/"
     ]
   },
   "ante": {
@@ -108,6 +112,8 @@
     "maxContributors": 3,
     "contributorSelection": "commits",
     "spdxLicense": "MPL-2.0",
-    "licenseUrl": "https://mozilla.org/MPL/2.0"
-  }
+    "licenseUrl": "https://mozilla.org/MPL/2.0",
+    "exclude": ["npm/**", "coverage/**", "docs/**"]
+  },
+  "minimumDependencyAge": 0
 }

@@ -1,8 +1,8 @@
-//----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+//--------------------------------------------------------------------------------------------------
+// Copyright (c) 2025-2026              orgrinrt                 orgrinrt@ikiuni.dev
 //                                      orgrinrt                 ort@hiisi.digital
-// SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
-//----------------------------------------------------------------------------------------------------
+// SPDX-License-Identifier: MPL-2.0     https://mozilla.org/MPL/2.0        ort@hiisi.digital
+//--------------------------------------------------------------------------------------------------
 
 /**
  * CLI command: fix
@@ -11,24 +11,27 @@
  * Adds missing headers, updates outdated ones, and ensures consistency.
  */
 
-import type { Contributor, ResolvedConfig } from "#core";
+import type { Contributor, ParsedHeader, ResolvedConfig } from "#core";
 import {
-  generateHeader,
   getCurrentGitUser,
   getFileYearRange,
   hasValidHeader,
-  matchesGlob,
+  omittedContributors,
   parseHeader,
   replaceHeader,
+  rewriteHeader,
   updateHeader,
+  withoutStackedHeaders,
 } from "#core";
+import { filesToActOn } from "./_files.ts";
 
 /**
  * Options for the fix command.
  */
-export interface FixOptions {
+interface FixOptions {
   /** Glob pattern to match files (overrides config.include) */
-  glob?: string;
+  /** The positionals, each a path, a directory or a glob. */
+  glob?: string | readonly string[];
   /** Dry run - show what would be fixed without making changes */
   dryRun?: boolean;
   /** Verbose output */
@@ -38,7 +41,7 @@ export interface FixOptions {
 /**
  * Result of fixing a single file.
  */
-export interface FixResult {
+interface FixResult {
   /** The file path */
   file: string;
   /** Whether the file was modified */
@@ -50,53 +53,32 @@ export interface FixResult {
 }
 
 /**
- * Checks if a path matches any of the given patterns.
+ * What changed, for the verbose listing. Not what decides to write: that is the
+ * comparison in `fixFile`, and this only puts names to the parts of it a reader
+ * would recognise.
  */
-function matchesAnyPattern(path: string, patterns: string[]): boolean {
-  return patterns.some((pattern) => matchesGlob(path, pattern));
-}
-
-/**
- * Recursively finds files matching patterns.
- */
-async function findFilesRecursive(
-  dir: string,
-  includePatterns: string[],
-  excludePatterns: string[],
-): Promise<string[]> {
-  const files: string[] = [];
-
-  try {
-    for await (const entry of Deno.readDir(dir)) {
-      const path = dir === "." ? entry.name : `${dir}/${entry.name}`;
-
-      // Check if path is excluded
-      if (matchesAnyPattern(path, excludePatterns)) {
-        continue;
-      }
-
-      if (entry.isDirectory) {
-        // Skip hidden directories
-        if (entry.name.startsWith(".")) {
-          continue;
-        }
-        const subFiles = await findFilesRecursive(
-          path,
-          includePatterns,
-          excludePatterns,
-        );
-        files.push(...subFiles);
-      } else if (entry.isFile) {
-        if (matchesAnyPattern(path, includePatterns)) {
-          files.push(path);
-        }
-      }
-    }
-  } catch {
-    // Directory read failed - skip silently
+function named(
+  parsed: ParsedHeader,
+  config: ResolvedConfig,
+  currentUser: Contributor | null,
+  currentYear: number,
+): string[] {
+  const updates: string[] = [];
+  if (parsed.yearEnd < currentYear) {
+    updates.push(`Update year to ${parsed.yearStart}-${currentYear}`);
   }
-
-  return files;
+  if (
+    currentUser && !parsed.contributors.some(
+      (one) => one.email.toLowerCase() === currentUser.email.toLowerCase(),
+    )
+  ) {
+    updates.push(`Add contributor: ${currentUser.name}`);
+  }
+  if (config.spdxLicense && parsed.spdxLicense !== config.spdxLicense) {
+    updates.push(`Set SPDX license to ${config.spdxLicense}`);
+  }
+  if (updates.length === 0) updates.push("Reformat to match the configuration");
+  return updates;
 }
 
 /**
@@ -109,10 +91,17 @@ async function fixFile(
   dryRun: boolean,
 ): Promise<FixResult> {
   try {
-    const content = await Deno.readTextFile(path);
+    const onDisk = await Deno.readTextFile(path);
     const currentYear = new Date().getFullYear();
 
-    if (!hasValidHeader(content)) {
+    // A file this tool wrote to more than once carries a stack of header blocks,
+    // and only the first was ever read again. `check` reports the stack, so `fix`
+    // has to be able to clear it: a repair command that leaves a file its own
+    // check rejects is the disagreement this whole release is about.
+    const content = withoutStackedHeaders(onDisk, config);
+    const collapsed = content !== onDisk;
+
+    if (!hasValidHeader(content, config)) {
       // No header - create one
       const contributors: Contributor[] = currentUser ? [currentUser] : [];
 
@@ -121,8 +110,13 @@ async function fixFile(
       const yearStart = yearRange?.firstYear ?? currentYear;
       const yearEnd = yearRange?.lastYear ?? currentYear;
 
-      const header = generateHeader(config, contributors, yearStart, yearEnd);
-      const newContent = replaceHeader(content, header);
+      const newContent = rewriteHeader(
+        content,
+        config,
+        contributors,
+        yearStart,
+        yearEnd,
+      );
 
       if (!dryRun) {
         await Deno.writeTextFile(path, newContent);
@@ -137,7 +131,7 @@ async function fixFile(
     }
 
     // Header exists - check if updates needed
-    const parsed = parseHeader(content);
+    const parsed = parseHeader(content, config);
     if (!parsed) {
       return {
         file: path,
@@ -147,27 +141,36 @@ async function fixFile(
       };
     }
 
-    let needsUpdate = false;
-    const updates: string[] = [];
+    // What the header should be, and the only thing that decides whether to
+    // write. A list of conditions here was the same list twice, and the two
+    // drifted: `check` reported an spdx mismatch that `fix` had no condition
+    // for, so the repair command said there was nothing to repair and a
+    // pre-commit hook running `check` blocked every commit after a relicense.
+    const updatedHeader = updateHeader(parsed, config, {
+      newContributor: currentUser ?? undefined,
+      updateYear: currentYear,
+    });
 
-    // Check if year needs updating
-    if (parsed.yearEnd < currentYear) {
-      needsUpdate = true;
-      updates.push(`Update year to ${parsed.yearStart}-${currentYear}`);
+    // Whose credit this is about to leave out. The limit is deliberate and the
+    // silence was not: a name went out of a file with nothing anywhere saying it
+    // had been there.
+    const willing = [...parsed.contributors];
+    if (
+      currentUser &&
+      !willing.some((c) => c.email.toLowerCase() === currentUser.email.toLowerCase())
+    ) {
+      willing.push(currentUser);
     }
+    const omitted = omittedContributors(willing, config);
 
-    // Check if current user needs to be added
-    if (currentUser) {
-      const hasCurrentUser = parsed.contributors.some(
-        (c) => c.email.toLowerCase() === currentUser.email.toLowerCase(),
+    if (omitted.length > 0) {
+      console.log(
+        `  ${path}: ${omitted.length} past the limit of ${config.maxContributors}, ` +
+          `not in the header: ${omitted.map((c) => c.name).join(", ")}`,
       );
-      if (!hasCurrentUser) {
-        needsUpdate = true;
-        updates.push(`Add contributor: ${currentUser.name}`);
-      }
     }
 
-    if (!needsUpdate) {
+    if (updatedHeader === parsed.raw && !collapsed) {
       return {
         file: path,
         modified: false,
@@ -175,12 +178,9 @@ async function fixFile(
       };
     }
 
-    // Update the header
-    const updatedHeader = updateHeader(parsed, config, {
-      newContributor: currentUser ?? undefined,
-      updateYear: currentYear,
-    });
-    const newContent = replaceHeader(content, updatedHeader, parsed);
+    const updates = named(parsed, config, currentUser, currentYear);
+    if (collapsed) updates.unshift("Removed a duplicate header block");
+    const newContent = replaceHeader(content, updatedHeader, parsed, config);
 
     if (!dryRun) {
       await Deno.writeTextFile(path, newContent);
@@ -213,11 +213,7 @@ export async function runFix(
   config: ResolvedConfig,
   options: FixOptions = {},
 ): Promise<FixResult[]> {
-  const includePatterns = options.glob ? [options.glob] : config.include;
-  const excludePatterns = config.exclude;
-
-  // Find all files to process
-  const files = await findFilesRecursive(".", includePatterns, excludePatterns);
+  const files = await filesToActOn(config, options.glob);
 
   if (options.verbose) {
     console.log(`Found ${files.length} file(s) to process`);
@@ -272,21 +268,4 @@ export async function runFix(
   }
 
   return results;
-}
-
-/**
- * Entry point for CLI invocation.
- */
-export async function main(args: string[]): Promise<number> {
-  const { loadConfig } = await import("#core");
-  const config = await loadConfig();
-
-  const results = await runFix(config, {
-    glob: args[0],
-    dryRun: args.includes("--dry-run"),
-    verbose: args.includes("--verbose") || args.includes("-v"),
-  });
-
-  const modified = results.filter((r) => r.modified).length;
-  return modified > 0 ? 0 : 0;
 }

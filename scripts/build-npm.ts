@@ -1,8 +1,8 @@
-//----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+//--------------------------------------------------------------------------------------------------
+// Copyright (c) 2025-2026              orgrinrt                 orgrinrt@ikiuni.dev
 //                                      orgrinrt                 ort@hiisi.digital
-// SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
-//----------------------------------------------------------------------------------------------------
+// SPDX-License-Identifier: MPL-2.0     https://mozilla.org/MPL/2.0        ort@hiisi.digital
+//--------------------------------------------------------------------------------------------------
 
 /**
  * Build script for npm package.
@@ -29,19 +29,15 @@ const outDir = "./npm";
 
 await emptyDir(outDir);
 
-// Create a temporary import map for dnt that resolves our aliases
-const importMap = {
-  imports: {
-    "#core": "./core/mod.ts",
-    "#git": "./git/mod.ts",
-    "#cli": "./cli/mod.ts",
-    "@std/fs": "jsr:@std/fs@^1.0.0",
-    "@std/path": "jsr:@std/path@^1.0.0",
-    "@std/fmt": "jsr:@std/fmt@^1.0.0",
-    "@std/assert": "jsr:@std/assert@^1.0.0",
-    "@std/testing": "jsr:@std/testing@^1.0.0",
-  },
-};
+// The import map dnt is given is deno.json's own, not a second copy of it.
+//
+// It used to be written out here by hand, and the two disagreed: this list named five
+// `@std` packages and deno.json named six. dnt therefore met a bare `@std/toml` specifier
+// it could not resolve, left it in the output as written, and declared no dependency for
+// it. The built package's `dependencies` was `{}` while its code imported `@std/toml`, so
+// `npm install ante-cli` produced something that threw `ERR_MODULE_NOT_FOUND` on first
+// use. Nothing caught it because nothing had ever run the built package.
+const importMap = { imports: denoJson.imports as Record<string, string> };
 
 const importMapPath = "./npm_import_map.json";
 await Deno.writeTextFile(importMapPath, JSON.stringify(importMap, null, 2));
@@ -57,12 +53,21 @@ try {
     ],
     outDir,
     importMap: importMapPath,
+    // The whole shim, not the test-only form. This code calls `Deno.cwd`, `Deno.stat`,
+    // `Deno.readTextFile` and `Deno.Command` at runtime, and `{ test: false }` puts the
+    // shim nowhere, so the built package threw `Deno is not defined` from `loadConfig` on
+    // the first call. That is the package's own config loader, in the package that exists
+    // to be used from Node.
     shims: {
-      deno: {
-        test: false,
-      },
+      deno: true,
     },
-    typeCheck: false, // Skip type checking - Deno.Command shim typing issues
+    // The built output is type-checked. It was not, on the reasoning that the shim's
+    // declarations lack `Deno.Command` while its runtime has it. Neither half held: the
+    // runtime does not have it either, and the file cited as checking so did not exist.
+    // Nothing reaches for `Deno.Command` any more, because `core/run.ts` picks whichever
+    // spawn its runtime actually offers, so the check that was turned off to hide the
+    // problem goes back on now the problem is gone.
+    typeCheck: "both",
     scriptModule: false, // ESM only - CLI uses top-level await
     test: false,
     skipSourceOutput: true,
@@ -74,7 +79,7 @@ try {
       name: NPM_PACKAGE_NAME,
       version: denoJson.version,
       description:
-        "Manage copyright headers in your source files. Check, fix, and keep them consistent.",
+        "Copyright headers as a maintained artifact. Checked, fixed and kept consistent across a whole tree.",
       license: denoJson.license,
       type: "module",
       repository: {
@@ -128,21 +133,36 @@ try {
       const pkgJson = JSON.parse(Deno.readTextFileSync(pkgJsonPath));
 
       // Add exports field for proper ESM resolution
+      // `types` first, because export conditions are matched in order and
+      // typescript takes the first that applies. Behind `import` it is reached
+      // only through the fallback to a sibling `.d.ts`, which is the same thing
+      // that hid these paths naming a directory the build does not emit.
       pkgJson.exports = {
         ".": {
+          types: "./esm/mod.d.ts",
           import: "./esm/mod.js",
-          types: "./types/mod.d.ts",
         },
         "./cli": {
+          types: "./esm/cli/mod.d.ts",
           import: "./esm/cli/mod.js",
-          types: "./types/cli/mod.d.ts",
         },
       };
 
+      // The legacy pair, for a consumer on `moduleResolution: "node"`, which
+      // reads neither `exports` nor `module` and otherwise resolves nothing at
+      // all. `main` names the esm entry because that is the only entry there is:
+      // this package is esm only, so a commonjs consumer needs a dynamic import
+      // either way and there is nothing here that would change that.
+      pkgJson.main = "./esm/mod.js";
+      pkgJson.types = "./esm/mod.d.ts";
+
       // Add files field to ensure only needed files are published
+      // dnt emits declarations beside the javascript in `esm`, so there is no
+      // `types` directory and naming one leaves every `types` condition pointing
+      // at nothing. It resolved anyway, through typescript's fallback to a
+      // sibling `.d.ts`, which is why nothing noticed.
       pkgJson.files = [
         "esm",
-        "types",
         "schema",
         "README.md",
         "LICENSE",

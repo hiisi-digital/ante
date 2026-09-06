@@ -1,16 +1,20 @@
-//----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
-// SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
-//----------------------------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
+// Copyright (c) 2025-2026              orgrinrt                 orgrinrt@ikiuni.dev
+//                                      orgrinrt                 ort@hiisi.digital
+// SPDX-License-Identifier: MPL-2.0     https://mozilla.org/MPL/2.0        ort@hiisi.digital
+//--------------------------------------------------------------------------------------------------
 
 /**
- * Git integration module for ante.
+ * Everything that needs a repository.
  *
- * Provides utilities for:
- * - Parsing git history for contributor information
- * - Installing and managing git hooks
- * - Reading git configuration
+ * Reading history for contributors and year ranges, and reading git's own config
+ * for the maintainer.
+ *
+ * The reads answer with nothing outside a repository rather than failing, since
+ * a file in a tarball is a normal thing to run over: `getStagedFiles` gives an
+ * empty list and `isTrackedByGit` gives false.
+ *
+ * @module
  */
 
 export * from "./history.ts";
-export * from "./hooks.ts";

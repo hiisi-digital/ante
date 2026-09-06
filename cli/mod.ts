@@ -1,17 +1,18 @@
-//----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+//--------------------------------------------------------------------------------------------------
+// Copyright (c) 2025-2026              orgrinrt                 orgrinrt@ikiuni.dev
 //                                      orgrinrt                 ort@hiisi.digital
-// SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
-//----------------------------------------------------------------------------------------------------
+// SPDX-License-Identifier: MPL-2.0     https://mozilla.org/MPL/2.0        ort@hiisi.digital
+//--------------------------------------------------------------------------------------------------
 
 /**
- * CLI entry point for ante.
+ * The command line, which is argument parsing over `#core` and `#git`.
  *
- * Provides commands for managing copyright headers:
- * - init: Set up configuration and install git hooks
- * - check: Verify headers are present and valid
- * - fix: Add or update headers across files
- * - add: Add header to a specific file
+ * Four commands: `init` writes a configuration, `check` verifies
+ * and exits non-zero when anything is wrong, `fix` rewrites every header, and
+ * `add` puts one on a named file. No logic lives here that the library does not
+ * already export.
+ *
+ * @module
  */
 
 import { loadConfig, VERSION } from "#core";
@@ -19,8 +20,6 @@ import { add } from "./commands/add.ts";
 import { runCheck } from "./commands/check.ts";
 import { runFix } from "./commands/fix.ts";
 import { runInit } from "./commands/init.ts";
-
-// VERSION is imported from #core and read from deno.json
 
 /** Available commands */
 type Command = "init" | "check" | "fix" | "add" | "help" | "version";
@@ -54,9 +53,9 @@ USAGE:
   ante <command> [options]
 
 COMMANDS:
-  init              Set up configuration and install git hooks
-  check [glob]      Verify headers are present and valid
-  fix [glob]        Fix all headers to match configuration
+  init              Write the configuration into the project's manifest
+  check [path]      Verify headers are present and valid
+  fix [path]        Fix all headers to match configuration
   add <file>        Add header to a specific file
   help              Show this help message
   version           Show version information
@@ -72,6 +71,7 @@ OPTIONS:
 EXAMPLES:
   ante init                    # Set up ante in your project
   ante check                   # Check all files
+  ante check src               # Check one directory
   ante check "src/**/*.ts"     # Check specific files
   ante fix                     # Fix all headers
   ante add src/new-file.ts     # Add header to one file
@@ -178,7 +178,6 @@ export async function main(args: string[]): Promise<number> {
       try {
         await runInit({
           yes: parsed.flags.yes,
-          skipHooks: false,
         });
         return 0;
       } catch (error) {
@@ -190,7 +189,7 @@ export async function main(args: string[]): Promise<number> {
     case "check": {
       try {
         const result = await runCheck(config, {
-          glob: parsed.args[0] ?? parsed.flags.glob,
+          glob: parsed.args.length > 0 ? parsed.args : parsed.flags.glob,
           verbose: parsed.flags.verbose,
           format: parsed.flags.format ?? "human",
         });
@@ -204,7 +203,7 @@ export async function main(args: string[]): Promise<number> {
     case "fix": {
       try {
         const results = await runFix(config, {
-          glob: parsed.args[0] ?? parsed.flags.glob,
+          glob: parsed.args.length > 0 ? parsed.args : parsed.flags.glob,
           dryRun: parsed.flags.dryRun,
           verbose: parsed.flags.verbose,
         });
@@ -228,6 +227,7 @@ export async function main(args: string[]): Promise<number> {
         {
           file: parsed.args[0],
           force: parsed.flags.force,
+          dryRun: parsed.flags.dryRun,
         },
         config,
       );

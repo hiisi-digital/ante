@@ -1,8 +1,8 @@
-//----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
+//--------------------------------------------------------------------------------------------------
+// Copyright (c) 2025-2026              orgrinrt                 orgrinrt@ikiuni.dev
 //                                      orgrinrt                 ort@hiisi.digital
-// SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
-//----------------------------------------------------------------------------------------------------
+// SPDX-License-Identifier: MPL-2.0     https://mozilla.org/MPL/2.0        ort@hiisi.digital
+//--------------------------------------------------------------------------------------------------
 
 /**
  * End-to-end integration tests for ante.
@@ -18,7 +18,9 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
+import { generateHeader, loadConfig, resolveConfig } from "#core";
 import { main as cliMain } from "../cli/mod.ts";
+import { createTempDir, readFile, removeDir, writeFile } from "./_utils/fs.ts";
 
 /**
  * Test environment representing a simulated project.
@@ -28,42 +30,6 @@ interface TestEnvironment {
   rootDir: string;
   /** Original working directory to restore after tests */
   originalCwd: string;
-}
-
-/**
- * Creates a temporary directory for the test environment.
- */
-async function createTempDir(prefix: string): Promise<string> {
-  return await Deno.makeTempDir({ prefix });
-}
-
-/**
- * Removes a directory recursively.
- */
-async function removeDir(path: string): Promise<void> {
-  try {
-    await Deno.remove(path, { recursive: true });
-  } catch {
-    // Ignore errors during cleanup
-  }
-}
-
-/**
- * Writes a file, creating parent directories as needed.
- */
-async function writeFile(path: string, content: string): Promise<void> {
-  const dir = path.substring(0, path.lastIndexOf("/"));
-  if (dir) {
-    await Deno.mkdir(dir, { recursive: true });
-  }
-  await Deno.writeTextFile(path, content);
-}
-
-/**
- * Reads a file and returns its content.
- */
-async function readFile(path: string): Promise<string> {
-  return await Deno.readTextFile(path);
 }
 
 /**
@@ -403,6 +369,23 @@ describe("E2E: ante add", () => {
     await teardownEnvironment(env);
   });
 
+  // `fix` had a dry-run test and `add` did not, so `add` accepted --dry-run,
+  // printed that it was adding a header, and wrote the file anyway. The flag
+  // was parsed by the cli and never reached the command.
+  it("should not modify the file in dry-run mode", async () => {
+    const originalContent = `export const answer = 42;\n`;
+    await writeFile(join(env.rootDir, "src/answer.ts"), originalContent);
+    await gitCommit(env.rootDir, "Add answer");
+
+    const { exitCode } = await captureOutput(
+      () => cliMain(["add", "src/answer.ts", "--dry-run"]),
+    );
+
+    assertEquals(exitCode, 0);
+    const afterContent = await readFile(join(env.rootDir, "src/answer.ts"));
+    assertEquals(afterContent, originalContent);
+  });
+
   it("should add header to a specific file", async () => {
     await writeFile(
       join(env.rootDir, "src/feature.ts"),
@@ -622,6 +605,43 @@ describe("E2E: Edge Cases", () => {
     assertStringIncludes(content, "SPDX-License-Identifier");
   });
 
+  it("should put the header above a rust inner attribute", async () => {
+    // A positional narrows the include set rather than replacing it, so a rust
+    // crate says it is a rust crate. That is what an `ante.toml` on one does,
+    // and this test is about where the header lands rather than about which
+    // files a run walks.
+    await writeFile(
+      join(env.rootDir, "deno.json"),
+      JSON.stringify({
+        ...TEST_DENO_JSON,
+        ante: {
+          ...TEST_DENO_JSON.ante,
+          include: [...TEST_DENO_JSON.ante.include, "**/*.rs"],
+        },
+      }, null, 2),
+    );
+    await writeFile(
+      join(env.rootDir, "src/lib.rs"),
+      `#![no_std]\n\npub fn f() {}\n`,
+    );
+    await gitCommit(env.rootDir, "Add a no_std crate root");
+
+    const { exitCode } = await captureOutput(
+      () => cliMain(["fix", "src/lib.rs"]),
+    );
+    assertEquals(exitCode, 0);
+
+    const content = await readFile(join(env.rootDir, "src/lib.rs"));
+    assertEquals(content.split("\n")[0].startsWith("//"), true);
+    assertStringIncludes(content, "#![no_std]");
+
+    // The header has to be somewhere `check` can find it again, which is the
+    // half that matters: on line two it is written once and then reported
+    // missing on every run afterwards.
+    const second = await captureOutput(() => cliMain(["check", "src/lib.rs"]));
+    assertEquals(second.exitCode, 0);
+  });
+
   it("should handle deeply nested files", async () => {
     await writeFile(
       join(env.rootDir, "src/deep/nested/path/to/file.ts"),
@@ -783,19 +803,26 @@ describe("E2E: Configuration Handling", () => {
   });
 
   it("should respect custom width from config", async () => {
+    // The width here is deliberately not the default. Asserting against the
+    // default cannot tell a configuration being honoured from one being
+    // ignored, and the assertion is unconditional for the same reason: guarding
+    // it on finding a separator meant a run that wrote no header at all passed.
+    await writeFile(
+      join(env.rootDir, "deno.json"),
+      JSON.stringify(
+        { ...TEST_DENO_JSON, ante: { ...TEST_DENO_JSON.ante, width: 73 } },
+        null,
+        2,
+      ),
+    );
     await writeFile(join(env.rootDir, "src/width.ts"), `export const a = 1;\n`);
     await gitCommit(env.rootDir, "Add width test file");
 
     await cliMain(["fix", "src/width.ts"]);
 
-    const content = await readFile(join(env.rootDir, "src/width.ts"));
-    const lines = content.split("\n");
-    const separatorLine = lines.find((l) => /^\/\/-+$/.test(l));
-
-    if (separatorLine) {
-      // Should match configured width of 100
-      assertEquals(separatorLine.length, 100);
-    }
+    const lines = (await readFile(join(env.rootDir, "src/width.ts"))).split("\n");
+    const separator = lines.find((l) => /^\/\/[-=*]+$/.test(l));
+    assertEquals(separator?.length, 73);
   });
 
   it("should respect include patterns from config", async () => {
@@ -881,5 +908,215 @@ describe("E2E: Exclude Patterns", () => {
       line.includes("dist/bundle.js") && (line.includes("[ok]") || line.includes("[fail]"))
     );
     assertEquals(distLines.length, 0, "dist files should not be checked");
+  });
+});
+
+// ============================================================================
+// Tests: what fix repairs
+// ============================================================================
+
+describe("fix repairs whatever the configuration decides", () => {
+  let env: TestEnvironment;
+
+  /** The manifest, with `edit` applied to its `ante` block. */
+  async function reconfigure(edit: Record<string, unknown>): Promise<void> {
+    await writeFile(
+      join(env.rootDir, "deno.json"),
+      JSON.stringify(
+        { ...TEST_DENO_JSON, ante: { ...TEST_DENO_JSON.ante, ...edit } },
+        null,
+        2,
+      ),
+    );
+  }
+
+  /** Every line of a file that reads as a separator, however it is spelled. */
+  function separators(content: string): string[] {
+    return content.split("\n").filter((one) => /^\S+[-=*~]{3,}$/.test(one));
+  }
+
+  /** A file carrying a header this configuration wrote. */
+  async function headered(name: string): Promise<string> {
+    const path = join(env.rootDir, name);
+    await writeFile(path, "export const a = 1;\n");
+    await gitCommit(env.rootDir, `Add ${name}`);
+    await captureOutput(() => cliMain(["add", name]));
+    return path;
+  }
+
+  beforeEach(async () => {
+    env = await setupBasicEnvironment();
+  });
+
+  afterEach(async () => {
+    await teardownEnvironment(env);
+  });
+
+  it("leaves a header the configuration already agrees with alone", async () => {
+    // The control for every case below. Without it each of them passes against
+    // a fix that rewrites unconditionally, which repairs everything and is
+    // wrong for a different reason: it would touch every file on every run.
+    const path = await headered("src/settled.ts");
+    const before = await readFile(path);
+
+    const { output } = await captureOutput(() => cliMain(["fix", "--verbose"]));
+
+    assertEquals(await readFile(path), before);
+    assertStringIncludes(output.join("\n"), "Unchanged: 1");
+  });
+
+  it("repairs an spdx mismatch, which check reports and fix used to ignore", async () => {
+    // A project that relicenses. `check` flagged the mismatch, `fix` had no
+    // condition for it and reported nothing to do, and the pre-commit hook
+    // `init` installs runs `check`, so every commit was blocked with the repair
+    // command insisting the file was clean.
+    const path = await headered("src/relicensed.ts");
+    await reconfigure({ spdxLicense: "Apache-2.0" });
+
+    const failed = await captureOutput(() => cliMain(["check"]));
+    assertEquals(failed.exitCode, 1);
+    assertStringIncludes(failed.output.join("\n"), "does not match config");
+
+    await captureOutput(() => cliMain(["fix"]));
+
+    assertStringIncludes(await readFile(path), "SPDX-License-Identifier: Apache-2.0");
+    assertEquals((await captureOutput(() => cliMain(["check"]))).exitCode, 0);
+  });
+
+  it("repairs a width the header was not written at", async () => {
+    const path = await headered("src/narrowed.ts");
+    const wide = (await readFile(path)).split("\n")[0]!;
+    await reconfigure({ width: 60 });
+
+    await captureOutput(() => cliMain(["fix"]));
+
+    const narrow = (await readFile(path)).split("\n")[0]!;
+    assertEquals(narrow.length, 60);
+    assertEquals(wide.length, 100);
+  });
+
+  it("repairs a separator character the header was not written with", async () => {
+    const path = await headered("src/starred.ts");
+    await reconfigure({ separatorChar: "*" });
+
+    await captureOutput(() => cliMain(["fix"]));
+
+    const first = (await readFile(path)).split("\n")[0]!;
+    assertStringIncludes(first, "****");
+    assertEquals(first.includes("---"), false);
+  });
+
+  it("repairs a column the header was not written at", async () => {
+    const path = await headered("src/shifted.ts");
+    const before = (await readFile(path)).split("\n")[1]!;
+    await reconfigure({ nameColumn: 55 });
+
+    await captureOutput(() => cliMain(["fix"]));
+
+    const after = (await readFile(path)).split("\n")[1]!;
+    assertEquals(after.indexOf("Test Author"), 55);
+    assertEquals(before.indexOf("Test Author") === 55, false);
+  });
+
+  it("is finished after one run, so a second changes nothing", async () => {
+    // Comparing the header against what the configuration would write is what
+    // decides to write at all, so a run that is not idempotent means the two
+    // disagree about something and every file would be touched forever.
+    const path = await headered("src/twice.ts");
+    await reconfigure({ width: 72, separatorChar: "=", spdxLicense: "Apache-2.0" });
+
+    await captureOutput(() => cliMain(["fix"]));
+    const once = await readFile(path);
+    const second = await captureOutput(() => cliMain(["fix", "--verbose"]));
+
+    assertEquals(await readFile(path), once);
+    assertStringIncludes(second.output.join("\n"), "Unchanged: 1");
+  });
+
+  it("keeps a contributor the configuration could not have re-derived", async () => {
+    // `updateHeader` rather than a rebuild, and this is why: a name nobody has
+    // committed as survives a repair that touches everything around it.
+    const path = join(env.rootDir, "src/manual.ts");
+    await writeFile(path, "export const a = 1;\n");
+    await gitCommit(env.rootDir, "Add manual.ts");
+
+    const config = resolveConfig(await loadConfig(env.rootDir));
+    const header = generateHeader(
+      config,
+      [
+        { name: "Test Author", email: "test@example.com" },
+        { name: "Hand Added", email: "hand@example.com" },
+      ],
+      2024,
+      2026,
+    );
+    await writeFile(path, `${header}\n\nexport const a = 1;\n`);
+
+    await reconfigure({ width: 72 });
+    await captureOutput(() => cliMain(["fix"]));
+
+    const after = await readFile(path);
+    assertStringIncludes(after, "hand@example.com");
+    assertStringIncludes(after, "2024-2026");
+    assertEquals(after.split("\n")[0]!.length, 72);
+  });
+  it("does not stack a second header under a comment prefix of its own", async () => {
+    // Every line pattern used to hardcode `//`, so a `#` header read as absent
+    // and `fix` prepended another one, every run, without bound.
+    await reconfigure({ commentPrefix: "#", include: ["**/*.py"] });
+    const path = join(env.rootDir, "script.py");
+    await writeFile(path, "x = 1\n");
+    await gitCommit(env.rootDir, "Add script.py");
+
+    await captureOutput(() => cliMain(["fix"]));
+    const once = await Deno.readTextFile(path);
+    await captureOutput(() => cliMain(["fix"]));
+    await captureOutput(() => cliMain(["fix"]));
+
+    assertEquals(separators(once).length, 2);
+    assertEquals(await Deno.readTextFile(path), once);
+  });
+
+  it("does not stack one under a separator character of its own", async () => {
+    await reconfigure({ separatorChar: "~" });
+    const path = await headered("tilde.ts");
+
+    const once = await Deno.readTextFile(path);
+    await captureOutput(() => cliMain(["fix"]));
+    await captureOutput(() => cliMain(["fix"]));
+
+    assertEquals(separators(once).length, 2);
+    assertEquals(await Deno.readTextFile(path), once);
+  });
+
+  it("replaces a block it cannot read rather than writing above it", async () => {
+    // The block a project already has says whatever its own convention said,
+    // and this tool reads none of it: no year, no address, no tag it knows. A
+    // block is still a block, so the repair replaces it. Writing above it would
+    // leave a second header in every file in the tree, on the run meant to
+    // adopt the tool.
+    const path = join(env.rootDir, "adopted.ts");
+    const rule = `//${"-".repeat(98)}`;
+    await writeFile(
+      path,
+      [
+        rule,
+        "// Copyright Acme Corporation. All rights reserved.",
+        rule,
+        "",
+        "export const a = 1;",
+        "",
+      ]
+        .join("\n"),
+    );
+    await gitCommit(env.rootDir, "Add adopted.ts");
+
+    await captureOutput(() => cliMain(["fix"]));
+    const once = await Deno.readTextFile(path);
+    await captureOutput(() => cliMain(["fix"]));
+
+    assertEquals(separators(once).length, 2);
+    assertStringIncludes(once, "export const a = 1;");
+    assertEquals(await Deno.readTextFile(path), once);
   });
 });

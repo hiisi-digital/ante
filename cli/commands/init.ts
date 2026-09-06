@@ -1,26 +1,25 @@
-//----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
-// SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
-//----------------------------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
+// Copyright (c) 2025-2026              orgrinrt                 orgrinrt@ikiuni.dev
+//                                      orgrinrt                 ort@hiisi.digital
+// SPDX-License-Identifier: MPL-2.0     https://mozilla.org/MPL/2.0        ort@hiisi.digital
+//--------------------------------------------------------------------------------------------------
 
 /**
  * CLI command: init
  *
- * Sets up ante configuration in deno.json and installs git hooks.
+ * Sets up ante configuration in deno.json.
  */
 
 import type { AnteConfig } from "#core";
-import { deriveLicenseUrl, loadConfig } from "#core";
-import { installHook } from "#git";
+import { deriveLicenseUrl } from "#core";
+import { readJsonFile } from "#core";
 
 /**
  * Options for the init command.
  */
-export interface InitOptions {
+interface InitOptions {
   /** Skip interactive prompts and use defaults */
   yes?: boolean;
-  /** Skip git hook installation */
-  skipHooks?: boolean;
   /** Target directory (defaults to cwd) */
   dir?: string;
 }
@@ -28,11 +27,9 @@ export interface InitOptions {
 /**
  * Result of the init command.
  */
-export interface InitResult {
+interface InitResult {
   /** Whether config was created or updated */
   configUpdated: boolean;
-  /** Whether hooks were installed */
-  hooksInstalled: boolean;
   /** Path to the config file */
   configPath: string;
 }
@@ -59,18 +56,6 @@ async function findOrCreateConfigPath(dir: string): Promise<string> {
   // Return the first existing file, or default to deno.json
   const found = results.find((r) => r !== null);
   return found ?? `${dir}/deno.json`;
-}
-
-/**
- * Reads a JSON file.
- */
-async function readJsonFile(path: string): Promise<Record<string, unknown>> {
-  try {
-    const content = await Deno.readTextFile(path);
-    return JSON.parse(content);
-  } catch {
-    return {};
-  }
 }
 
 /**
@@ -139,50 +124,13 @@ export async function runInit(options: InitOptions = {}): Promise<InitResult> {
     console.log(`  ante configuration already exists in ${configPath}`);
   }
 
-  // Install hooks unless skipped
-  let hooksInstalled = false;
-  if (!options.skipHooks) {
-    try {
-      // Load the full resolved config for hook generation
-      const resolvedConfig = await loadConfig(configPath);
-      await installHook(targetDir, resolvedConfig);
-      hooksInstalled = true;
-      console.log("  Installed git hooks to .githooks/");
-      console.log("  Configured git to use .githooks/ as hooks path");
-    } catch (error) {
-      console.error(
-        "  Warning: Failed to install git hooks:",
-        error instanceof Error ? error.message : error,
-      );
-    }
-  } else {
-    console.log("  Skipped git hook installation");
-  }
-
   console.log("");
   console.log("Done! ante is now configured.");
-
-  if (hooksInstalled) {
-    console.log("");
-    console.log("The pre-commit hook will automatically:");
-    console.log("  - Add copyright headers to new TypeScript files");
-    console.log("  - Add you as a contributor when you modify files");
-    console.log("  - Update year ranges when files change");
-  }
+  console.log("");
+  console.log("Run `ante fix` to write headers, or `ante check` from a hook or a pipeline.");
 
   return {
     configUpdated,
-    hooksInstalled,
     configPath,
   };
-}
-
-/**
- * Prompts the user for configuration values interactively.
- * Currently a stub - returns defaults.
- */
-export async function promptForConfig(): Promise<Partial<AnteConfig>> {
-  // For now, return defaults. Interactive prompts can be added later.
-  await Promise.resolve();
-  return createDefaultAnteConfig();
 }
