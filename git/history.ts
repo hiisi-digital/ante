@@ -1,16 +1,21 @@
-//----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
-// SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
-//----------------------------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
+// Copyright (c) 2025-2026              orgrinrt                 orgrinrt@ikiuni.dev
+//                                      orgrinrt                 ort@hiisi.digital
+// SPDX-License-Identifier: MPL-2.0     https://mozilla.org/MPL/2.0        ort@hiisi.digital
+//--------------------------------------------------------------------------------------------------
 
 /**
- * Git history utilities for extracting contributor information.
+ * The staging area, and whether git knows a file at all.
  *
- * Most of the git history functionality is implemented in core/contributors.ts.
- * This module re-exports the relevant functions and provides additional utilities.
+ * History reading proper lives in `core/contributors.ts`, next to the selection
+ * that consumes it. What is here is what a hook needs: the staged file list and
+ * a tracked check, neither of which has anything to do with contributors.
+ *
+ * @module
  */
 
 import { getContributorsFromHistory, getCurrentGitUser, getFileYearRange } from "#core";
+import { run } from "../core/run.ts";
 
 export { getContributorsFromHistory, getCurrentGitUser, getFileYearRange };
 
@@ -22,18 +27,17 @@ export { getContributorsFromHistory, getCurrentGitUser, getFileYearRange };
  */
 export async function getStagedFiles(filter = "ACM"): Promise<string[]> {
   try {
-    const cmd = new Deno.Command("git", {
-      args: ["diff", "--cached", "--name-only", `--diff-filter=${filter}`],
-      stdout: "piped",
-      stderr: "null",
-    });
-
-    const output = await cmd.output();
+    const output = await run("git", [
+      "diff",
+      "--cached",
+      "--name-only",
+      `--diff-filter=${filter}`,
+    ]);
     if (!output.success) {
       return [];
     }
 
-    const text = new TextDecoder().decode(output.stdout).trim();
+    const text = output.stdout.trim();
     if (!text) {
       return [];
     }
@@ -52,13 +56,7 @@ export async function getStagedFiles(filter = "ACM"): Promise<string[]> {
  */
 export async function isTrackedByGit(file: string): Promise<boolean> {
   try {
-    const cmd = new Deno.Command("git", {
-      args: ["ls-files", "--error-unmatch", file],
-      stdout: "null",
-      stderr: "null",
-    });
-
-    const output = await cmd.output();
+    const output = await run("git", ["ls-files", "--error-unmatch", file]);
     return output.success;
   } catch {
     return false;
@@ -73,13 +71,7 @@ export async function isTrackedByGit(file: string): Promise<boolean> {
  */
 export async function stageFile(file: string): Promise<boolean> {
   try {
-    const cmd = new Deno.Command("git", {
-      args: ["add", file],
-      stdout: "null",
-      stderr: "null",
-    });
-
-    const output = await cmd.output();
+    const output = await run("git", ["add", file]);
     return output.success;
   } catch {
     return false;

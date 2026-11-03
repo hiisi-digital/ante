@@ -1,17 +1,23 @@
-//----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
-// SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
-//----------------------------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
+// Copyright (c) 2025-2026              orgrinrt                 orgrinrt@ikiuni.dev
+//                                      orgrinrt                 ort@hiisi.digital
+// SPDX-License-Identifier: MPL-2.0     https://mozilla.org/MPL/2.0        ort@hiisi.digital
+//--------------------------------------------------------------------------------------------------
 
 /**
- * Contributor management for ante.
+ * Who ends up in a header, out of everyone who has touched the file.
  *
- * Handles extraction, selection, and formatting of contributors
- * for copyright headers based on configured strategies.
+ * A header has room for a few names and a file can have many, so the choice is a
+ * strategy: most commits, most lines, most recent, or a list written by hand.
+ * The ranking is over one file's history rather than the repository's, so a
+ * file's header names the people who worked on that file.
+ *
+ * @module
  */
 
 import type { AnteConfig, Contributor, ContributorSelection } from "./config.ts";
 import { getGitConfig } from "./config.ts";
+import { run } from "./run.ts";
 
 export type { Contributor };
 
@@ -90,25 +96,19 @@ function sortByStrategy(
 async function getContributorStats(file: string): Promise<ContributorStats[]> {
   try {
     // Get git log with author info, commit count per author
-    const cmd = new Deno.Command("git", {
-      args: [
-        "log",
-        "--follow",
-        "--format=%aN|%aE|%aI",
-        "--numstat",
-        "--",
-        file,
-      ],
-      stdout: "piped",
-      stderr: "null",
-    });
-
-    const output = await cmd.output();
+    const output = await run("git", [
+      "log",
+      "--follow",
+      "--format=%aN|%aE|%aI",
+      "--numstat",
+      "--",
+      file,
+    ]);
     if (!output.success) {
       return [];
     }
 
-    const text = new TextDecoder().decode(output.stdout);
+    const text = output.stdout;
     return parseGitLog(text);
   } catch {
     return [];
@@ -261,27 +261,26 @@ export async function getFileYearRange(
 ): Promise<{ firstYear: number; lastYear: number } | null> {
   try {
     // Get first commit date
-    const firstCmd = new Deno.Command("git", {
-      args: ["log", "--follow", "--format=%aI", "--reverse", "--", file],
-      stdout: "piped",
-      stderr: "null",
-    });
-    const firstOutput = await firstCmd.output();
+    const firstCmdResult = await run("git", [
+      "log",
+      "--follow",
+      "--format=%aI",
+      "--reverse",
+      "--",
+      file,
+    ]);
+    const firstOutput = firstCmdResult;
 
     // Get last commit date
-    const lastCmd = new Deno.Command("git", {
-      args: ["log", "-1", "--format=%aI", "--", file],
-      stdout: "piped",
-      stderr: "null",
-    });
-    const lastOutput = await lastCmd.output();
+    const lastCmdResult = await run("git", ["log", "-1", "--format=%aI", "--", file]);
+    const lastOutput = lastCmdResult;
 
     if (!firstOutput.success || !lastOutput.success) {
       return null;
     }
 
-    const firstText = new TextDecoder().decode(firstOutput.stdout).trim();
-    const lastText = new TextDecoder().decode(lastOutput.stdout).trim();
+    const firstText = firstOutput.stdout.trim();
+    const lastText = lastOutput.stdout.trim();
 
     const firstLine = firstText.split("\n")[0];
     const lastLine = lastText.split("\n")[0];

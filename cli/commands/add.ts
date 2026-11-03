@@ -1,7 +1,8 @@
-//----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
-// SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
-//----------------------------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
+// Copyright (c) 2025-2026              orgrinrt                 orgrinrt@ikiuni.dev
+//                                      orgrinrt                 ort@hiisi.digital
+// SPDX-License-Identifier: MPL-2.0     https://mozilla.org/MPL/2.0        ort@hiisi.digital
+//--------------------------------------------------------------------------------------------------
 
 /**
  * CLI command: add
@@ -11,23 +12,25 @@
 
 import type { Contributor, ResolvedConfig } from "#core";
 import {
-  generateHeader,
   getCurrentGitUser,
   getFileYearRange,
   hasValidHeader,
   parseHeader,
   replaceHeader,
+  rewriteHeader,
   updateHeader,
 } from "#core";
 
 /**
  * Options for the add command.
  */
-export interface AddOptions {
+interface AddOptions {
   /** Path to the file to add a header to */
   file: string;
   /** Force overwrite existing header */
   force?: boolean;
+  /** Report what would be written without writing it */
+  dryRun?: boolean;
 }
 
 /**
@@ -38,17 +41,17 @@ export interface AddOptions {
  * @returns Exit code (0 for success, non-zero for failure)
  */
 export async function add(options: AddOptions, config: ResolvedConfig): Promise<number> {
-  const { file, force = false } = options;
+  const { file, force = false, dryRun = false } = options;
 
   // Check if file exists
   try {
     const stat = await Deno.stat(file);
     if (!stat.isFile) {
-      console.error(`Error: ${file} is not a file`);
+      console.error(`${file} is not a file`);
       return 1;
     }
   } catch {
-    console.error(`Error: File not found: ${file}`);
+    console.error(`no file at ${file}`);
     return 1;
   }
 
@@ -58,13 +61,13 @@ export async function add(options: AddOptions, config: ResolvedConfig): Promise<
     content = await Deno.readTextFile(file);
   } catch (error) {
     console.error(
-      `Error reading file: ${error instanceof Error ? error.message : error}`,
+      `could not read the file: ${error instanceof Error ? error.message : error}`,
     );
     return 1;
   }
 
   // Check for existing header
-  if (hasValidHeader(content)) {
+  if (hasValidHeader(content, config)) {
     if (!force) {
       console.log(`File already has a copyright header: ${file}`);
       console.log("Use --force to overwrite");
@@ -79,7 +82,8 @@ export async function add(options: AddOptions, config: ResolvedConfig): Promise<
   const currentUser = await getCurrentGitUser();
   if (!currentUser) {
     console.error(
-      "Error: Could not determine git user. Please configure git user.name and user.email",
+      "no git user to credit. Set git user.name and user.email, or name the\n" +
+        "contributors in the config",
     );
     return 1;
   }
@@ -94,9 +98,9 @@ export async function add(options: AddOptions, config: ResolvedConfig): Promise<
 
   let newContent: string;
 
-  if (hasValidHeader(content) && force) {
+  if (hasValidHeader(content, config) && force) {
     // Force replace - parse existing and regenerate
-    const parsed = parseHeader(content);
+    const parsed = parseHeader(content, config);
     if (parsed) {
       // Merge existing contributors with current user
       const existingEmails = new Set(parsed.contributors.map((c) => c.email.toLowerCase()));
@@ -111,26 +115,28 @@ export async function add(options: AddOptions, config: ResolvedConfig): Promise<
         newContributor: currentUser,
         updateYear: currentYear,
       });
-      newContent = replaceHeader(content, updatedHeader, parsed);
+      newContent = replaceHeader(content, updatedHeader, parsed, config);
     } else {
-      // Can't parse, just regenerate
-      const header = generateHeader(config, contributors, yearStart, yearEnd);
-      newContent = replaceHeader(content, header);
+      // Can't read it, so write a fresh one carrying whatever it said.
+      newContent = rewriteHeader(content, config, contributors, yearStart, yearEnd);
     }
   } else {
     // No existing header - create new one
-    const header = generateHeader(config, contributors, yearStart, yearEnd);
-    newContent = replaceHeader(content, header);
+    newContent = rewriteHeader(content, config, contributors, yearStart, yearEnd);
   }
 
   // Write the file
+  if (dryRun) {
+    console.log(`Would write header to: ${file}`);
+    return 0;
+  }
   try {
     await Deno.writeTextFile(file, newContent);
     console.log(`Done.`);
     return 0;
   } catch (error) {
     console.error(
-      `Error writing file: ${error instanceof Error ? error.message : error}`,
+      `could not write the file: ${error instanceof Error ? error.message : error}`,
     );
     return 1;
   }

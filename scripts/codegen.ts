@@ -1,7 +1,8 @@
-//----------------------------------------------------------------------------------------------------
-// Copyright (c) 2025                    orgrinrt                    orgrinrt@ikiuni.dev
-// SPDX-License-Identifier: MPL-2.0      https://mozilla.org/MPL/2.0 contact@hiisi.digital
-//----------------------------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
+// Copyright (c) 2025-2026              orgrinrt                 orgrinrt@ikiuni.dev
+//                                      orgrinrt                 ort@hiisi.digital
+// SPDX-License-Identifier: MPL-2.0     https://mozilla.org/MPL/2.0        ort@hiisi.digital
+//--------------------------------------------------------------------------------------------------
 
 /**
  * Generates TypeScript types from the JSON schema.
@@ -78,12 +79,37 @@ function jsonTypeToTs(type: string, prop: JsonSchemaProperty, propName: string):
   }
 }
 
-function truncateDescription(str: string, maxLength = 60): string {
-  const cleaned = str.replace(/\n/g, " ").replace(/\s+/g, " ").trim();
-  if (cleaned.length <= maxLength) {
-    return cleaned;
+/** One line of the schema's prose, with its whitespace flattened.
+ *
+ * It used to cut at 57 characters and append an ellipsis, so every property on
+ * the published `AnteConfig` documented itself mid-word. That text is the type
+ * surface on jsr and in a consumer's editor, and the full description ships in
+ * the same package anyway, so the cut bought nothing. */
+function describe(str: string): string {
+  return str.replace(/\n/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/** A doc comment for one property, on one line where it fits and wrapped where
+ * it does not. `deno fmt` leaves comment bodies alone, so the wrapping is done
+ * here rather than left to it. */
+function docComment(text: string, indent = "  ", width = 96): string[] {
+  const oneLine = `${indent}/** ${text} */`;
+  if (oneLine.length <= width) return [oneLine];
+
+  const room = width - indent.length - 3;
+  const out: string[] = [`${indent}/**`];
+  let line = "";
+  for (const word of text.split(" ")) {
+    if (line === "") line = word;
+    else if (line.length + 1 + word.length <= room) line += ` ${word}`;
+    else {
+      out.push(`${indent} * ${line}`);
+      line = word;
+    }
   }
-  return cleaned.substring(0, maxLength - 3) + "...";
+  if (line !== "") out.push(`${indent} * ${line}`);
+  out.push(`${indent} */`);
+  return out;
 }
 
 function formatDefault(value: unknown, escapeForJsDoc = false): string {
@@ -155,7 +181,7 @@ async function main(): Promise<void> {
   for (const [propName, prop] of Object.entries(schema.properties)) {
     let comment = "";
     if (prop.description) {
-      comment = truncateDescription(prop.description);
+      comment = describe(prop.description);
     }
     // Skip defaults for arrays to avoid */" patterns breaking JSDoc
     if (prop.default !== undefined && prop.type !== "array") {
@@ -177,7 +203,7 @@ async function main(): Promise<void> {
     }
 
     if (comment) {
-      lines.push(`  /** ${comment} */`);
+      lines.push(...docComment(comment));
     }
     lines.push(`  ${propName}?: ${tsType};`);
   }
@@ -204,6 +230,29 @@ async function main(): Promise<void> {
         lines.push(`  ${propName}: undefined as never,`);
       }
     }
+  }
+
+  lines.push("};");
+  lines.push("");
+
+  // Bounds table
+  lines.push("/**");
+  lines.push(" * The range each numeric option is declared to hold, straight from the schema.");
+  lines.push(" *");
+  lines.push(" * The schema is where the ranges are written and it is not consulted at");
+  lines.push(" * runtime, so a bound that lived only there was a comment. Emitting it here");
+  lines.push(" * puts it somewhere the loader can read, which is the same reason the types");
+  lines.push(" * are generated rather than written twice.");
+  lines.push(" */");
+  lines.push(
+    "export const CONFIG_BOUNDS: Readonly<Record<string, { min: number; max: number }>> = {",
+  );
+
+  for (const [propName, prop] of Object.entries(schema.properties)) {
+    if (prop.minimum === undefined && prop.maximum === undefined) continue;
+    const min = prop.minimum ?? Number.NEGATIVE_INFINITY;
+    const max = prop.maximum ?? Number.POSITIVE_INFINITY;
+    lines.push(`  ${propName}: { min: ${min}, max: ${max} },`);
   }
 
   lines.push("};");

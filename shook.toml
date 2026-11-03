@@ -1,0 +1,16 @@
+# What ante wants run on a commit, for `git shook install` to register.
+#
+# ante used to install this itself and take `core.hooksPath` to do it, which
+# silently replaced whatever hook was already there. Declaring it here instead
+# means it runs beside everything else the repository wants rather than in place
+# of it, and that nothing is installed until somebody asks for it.
+#
+# It points at a script rather than naming the command directly, because the job
+# is two commands: fix the headers, then stage what the fix changed. `run` is an
+# argv and never a shell, so it cannot express that, and the script is the
+# documented way to say it. What it runs is then readable in a diff.
+
+name = "ante"
+
+[hooks.pre-commit]
+run = ["sh", "scripts/pre-commit.sh"]
